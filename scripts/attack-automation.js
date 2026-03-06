@@ -1,8 +1,3 @@
-// ============================================================
-// Tormenta20 Attack Automation - condition-automation.js
-// Automação de condições do Tormenta20
-// ============================================================
-
 import { MODULE_ID, emitSocket } from "./hooks.js";
 
 // Mapeamento completo das condições do Tormenta20

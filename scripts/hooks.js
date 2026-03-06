@@ -259,7 +259,7 @@ async function criarMensagemGM(totalAtaque, dadosAlvos, danoPorTipo, danoTotal) 
     html[0].querySelectorAll(".t20-aplicar, .t20-metade").forEach(btn =>
       btn.addEventListener("click", () => aplicarDano(btn))
     );
-  });
+  })
 }
 
 async function aplicarDano(btn) {
@@ -413,28 +413,38 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
         ${efeitoSucesso ? `<br>✅ Sucesso: ${efeitoSucesso}` : ""}
         ${formulaDano   ? `<br>💥 Dano: ${formulaDano}${tipoDano ? ` [${tipoDano}]` : ""}` : ""}
       </div>
-      <button class="t20-salvar"
-        data-salv-pericia="${salvPericia}"
-        data-salv-label="${salvLabel}"
-        data-cd="${cd}"
-        data-item="${nomeItem}"
-        data-dano="${danoRolado ?? 0}"
-        data-tipo-dano="${tipoDano}"
-        style="width:100%;padding:8px;border-radius:5px;cursor:pointer;font-size:0.95em;
-          background:linear-gradient(135deg,#1a4a1a,#2a6a2a);
-          border:1px solid #3a8a3a;color:#fff;font-weight:bold">
-        🎲 Rolar ${salvLabel} (CD ${cd})${danoRolado ? ` — Dano: ${danoRolado}` : ""}
-      </button>
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <button class="t20-salvar"
+          data-salv-pericia="${salvPericia}"
+          data-salv-label="${salvLabel}"
+          data-cd="${cd}"
+          data-item="${nomeItem}"
+          data-dano="${danoRolado ?? 0}"
+          data-tipo-dano="${tipoDano}"
+          data-poder="0"
+          style="flex:1;padding:8px;border-radius:5px;cursor:pointer;font-size:0.88em;
+            background:linear-gradient(135deg,#1a4a1a,#2a6a2a);
+            border:1px solid #3a8a3a;color:#fff;font-weight:bold">
+          🎲 Rolar ${salvLabel}${danoRolado ? ` (${danoRolado} / ${Math.floor(danoRolado/2)})` : ""}
+        </button>
+        <button class="t20-salvar"
+          data-salv-pericia="${salvPericia}"
+          data-salv-label="${salvLabel}"
+          data-cd="${cd}"
+          data-item="${nomeItem}"
+          data-dano="${danoRolado ?? 0}"
+          data-tipo-dano="${tipoDano}"
+          data-poder="1"
+          style="flex:1;padding:8px;border-radius:5px;cursor:pointer;font-size:0.88em;
+            background:linear-gradient(135deg,#1a3a4a,#1a4a6a);
+            border:1px solid #2a6a8a;color:#fff;font-weight:bold"
+          title="Sucesso: ÷4 | Falha: ÷2">
+          🛡️ Com Poder${danoRolado ? ` (${Math.floor(danoRolado/4)} / ${Math.floor(danoRolado/2)})` : ""}
+        </button>
+      </div>
     </div>`;
 
-  const novaMsg = await ChatMessage.create({ content: html });
-
-  Hooks.once("renderChatMessage", (msg, html) => {
-    if (msg.id !== novaMsg.id) return;
-    html[0].querySelectorAll(".t20-salvar").forEach(btn =>
-      btn.addEventListener("click", () => rolarSalvamento(btn))
-    );
-  });
+  await ChatMessage.create({ content: html });
 }
 
 async function rolarSalvamento(btn) {
@@ -445,6 +455,7 @@ async function rolarSalvamento(btn) {
   const nomeItem    = btn.dataset.item;
   const danoBase    = parseInt(btn.dataset.dano) || 0;
   const tipoDano    = (btn.dataset.tipoDano ?? "").toLowerCase();
+  const temPoder    = btn.dataset.poder === "1";
 
   const actor = canvas.tokens.controlled[0]?.actor ?? game.user.character;
   if (!actor) return ui.notifications.warn("Selecione seu token antes de rolar!");
@@ -458,7 +469,10 @@ async function rolarSalvamento(btn) {
   const cor     = sucesso ? "#27ae60" : "#e74c3c";
   const label   = sucesso ? "✅ SUCESSO!" : "❌ FALHOU!";
 
-  let danoFinal = sucesso ? Math.floor(danoBase / 2) : danoBase;
+  // Com poder: sucesso = ÷4, falha = ÷2 | Sem poder: sucesso = ÷2, falha = total
+  let danoFinal = temPoder
+    ? (sucesso ? Math.floor(danoBase / 4) : Math.floor(danoBase / 2))
+    : (sucesso ? Math.floor(danoBase / 2) : danoBase);
   let notaDano  = "";
 
   if (danoBase > 0) {
@@ -486,9 +500,13 @@ async function rolarSalvamento(btn) {
         notaDano   += ` (RD geral ${rdGeral}: ${antes}→${danoFinal})`;
       }
 
-      const prefixo = sucesso
-        ? `Sucesso! Dano reduzido: ${danoBase}→${Math.floor(danoBase/2)}`
-        : `Falhou! Dano total: ${danoBase}`;
+      const prefixo = temPoder
+        ? (sucesso
+            ? `✅ Sucesso + Poder! Dano: ${danoBase}÷4 = ${Math.floor(danoBase/4)}`
+            : `❌ Falhou + Poder! Dano: ${danoBase}÷2 = ${Math.floor(danoBase/2)}`)
+        : (sucesso
+            ? `✅ Sucesso! Dano: ${danoBase}÷2 = ${Math.floor(danoBase/2)}`
+            : `❌ Falhou! Dano total: ${danoBase}`);
       notaDano = prefixo + notaDano;
 
       if (danoFinal > 0) {
@@ -532,3 +550,14 @@ async function rolarSalvamento(btn) {
 
   // NÃO desabilita o botão — outros jogadores podem precisar rolar também
 }
+
+// Listener global persistente para botões de salvamento
+// Usa renderChatMessage (não Hooks.once) para funcionar para todos os jogadores
+Hooks.on("renderChatMessage", (message, html) => {
+  html[0].querySelectorAll(".t20-salvar").forEach(btn => {
+    // Evita adicionar múltiplos listeners
+    if (btn.dataset.listenerAdded) return;
+    btn.dataset.listenerAdded = "1";
+    btn.addEventListener("click", () => rolarSalvamento(btn));
+  });
+});

@@ -1,0 +1,383 @@
+// ============================================================
+// Tormenta20 Attack Automation - ui.js
+// Interface de usuário: painel de controle, botões e menus
+// ============================================================
+
+import { MODULE_ID, getSetting } from "./hooks.js";
+import { T20_CONDITIONS, T20ConditionAutomation } from "./condition-automation.js";
+import { T20DamageAutomation } from "./damage-automation.js";
+
+export class T20AutomationUI {
+
+  static init() {
+    // Adicionar botões ao painel de tokens
+    Hooks.on("getSceneControlButtons", (controls) => {
+      const tokenControls = controls.find((c) => c.name === "token");
+      if (!tokenControls) return;
+
+      tokenControls.tools.push({
+        name: "t20-automation",
+        title: "T20 Automação de Ataque",
+        icon: "fas fa-sword",
+        visible: true,
+        button: true,
+        onClick: () => T20AutomationUI.openAutomationPanel(),
+      });
+    });
+
+    // Adicionar menu de contexto aos tokens
+    Hooks.on("getTokenContextOptions", (html, options) => {
+      options.push(
+        {
+          name: "Aplicar Condição",
+          icon: '<i class="fas fa-exclamation-triangle"></i>',
+          condition: (li) => {
+            const token = canvas.tokens.get(li.data("tokenId"));
+            return token?.actor && (game.user.isGM || token.actor.isOwner);
+          },
+          callback: (li) => {
+            const token = canvas.tokens.get(li.data("tokenId"));
+            if (token?.actor) T20AutomationUI.openConditionDialog(token.actor);
+          },
+        },
+        {
+          name: "Aplicar Dano Manualmente",
+          icon: '<i class="fas fa-heart-broken"></i>',
+          condition: (li) => {
+            const token = canvas.tokens.get(li.data("tokenId"));
+            return token?.actor && (game.user.isGM || token.actor.isOwner);
+          },
+          callback: (li) => {
+            const token = canvas.tokens.get(li.data("tokenId"));
+            if (token?.actor) T20AutomationUI.openManualDamageDialog(token.actor);
+          },
+        },
+        {
+          name: "Ver Condições Ativas",
+          icon: '<i class="fas fa-list-ul"></i>',
+          condition: () => true,
+          callback: (li) => {
+            const token = canvas.tokens.get(li.data("tokenId"));
+            if (token?.actor) T20AutomationUI.showActiveConditions(token.actor);
+          },
+        }
+      );
+    });
+
+    // Adicionar botão de dano rápido ao HUD do token
+    Hooks.on("renderTokenHUD", (hud, html, data) => {
+      const actor = hud.object?.actor;
+      if (!actor) return;
+
+      const quickDamageBtn = $(`
+        <div class="control-icon t20-hud-btn" title="Dano Rápido">
+          <i class="fas fa-bolt"></i>
+        </div>
+      `);
+
+      quickDamageBtn.click(() => T20AutomationUI.openQuickDamageHUD(actor, html));
+      html.find(".left").append(quickDamageBtn);
+    });
+  }
+
+  // ── Painel Principal ──────────────────────────────────────
+  static openAutomationPanel() {
+    const selected = canvas.tokens.controlled;
+    if (!selected.length) {
+      return ui.notifications.warn("Selecione pelo menos um token.");
+    }
+
+    const actors = selected.map((t) => t.actor).filter(Boolean);
+
+    new Dialog({
+      title: "⚔️ T20 Automação de Ataques",
+      content: `
+        <div class="t20-panel">
+          <div class="t20-panel-section">
+            <h3>Tokens Selecionados</h3>
+            <ul>
+              ${actors.map((a) => `
+                <li class="t20-actor-item">
+                  <img src="${a.img}" class="t20-actor-img" />
+                  <span>${a.name}</span>
+                  <span class="t20-hp">PV: ${a.system?.hp?.value ?? a.system?.pv?.value ?? "?"}</span>
+                </li>
+              `).join("")}
+            </ul>
+          </div>
+          <div class="t20-panel-section">
+            <h3>Ações Rápidas</h3>
+            <div class="t20-action-grid">
+              <button class="t20-btn" data-action="heal">
+                <i class="fas fa-heart"></i> Curar
+              </button>
+              <button class="t20-btn danger" data-action="damage">
+                <i class="fas fa-heart-broken"></i> Aplicar Dano
+              </button>
+              <button class="t20-btn warning" data-action="condition">
+                <i class="fas fa-skull"></i> Condição
+              </button>
+              <button class="t20-btn" data-action="clear-conditions">
+                <i class="fas fa-broom"></i> Limpar Condições
+              </button>
+            </div>
+          </div>
+        </div>
+      `,
+      buttons: {
+        close: { label: "Fechar" },
+      },
+      render: (html) => {
+        html.find("[data-action='damage']").click(() =>
+          actors.forEach((a) => T20AutomationUI.openManualDamageDialog(a))
+        );
+        html.find("[data-action='heal']").click(() =>
+          actors.forEach((a) => T20AutomationUI.openHealDialog(a))
+        );
+        html.find("[data-action='condition']").click(() =>
+          actors.forEach((a) => T20AutomationUI.openConditionDialog(a))
+        );
+        html.find("[data-action='clear-conditions']").click(async () => {
+          for (const actor of actors) {
+            const t20Effects = actor.effects.filter(
+              (e) => e.flags?.[MODULE_ID]?.isT20Condition
+            );
+            for (const ef of t20Effects) await ef.delete();
+          }
+          ui.notifications.info("Condições removidas!");
+        });
+      },
+      default: "close",
+    }).render(true);
+  }
+
+  // ── Diálogo de Condições ──────────────────────────────────
+  static openConditionDialog(actor) {
+    const conditionList = Object.values(T20_CONDITIONS)
+      .map((c) => {
+        const active = actor.effects.some(
+          (e) => e.flags?.[MODULE_ID]?.conditionId === c.id
+        );
+        return `
+          <div class="t20-condition-row ${active ? "active" : ""}">
+            <img src="${c.icon}" class="t20-condition-icon" />
+            <label>
+              <input type="checkbox" name="${c.id}" ${active ? "checked" : ""} />
+              <span class="t20-condition-name">${c.label}</span>
+            </label>
+            <span class="t20-condition-desc">${c.effects[0]}</span>
+          </div>
+        `;
+      })
+      .join("");
+
+    new Dialog({
+      title: `Condições: ${actor.name}`,
+      content: `
+        <div class="t20-conditions-dialog">
+          <div class="t20-search-bar">
+            <input type="text" id="t20-condition-search" placeholder="Buscar condição..." />
+          </div>
+          <div class="t20-condition-list">${conditionList}</div>
+        </div>
+      `,
+      buttons: {
+        apply: {
+          icon: '<i class="fas fa-check"></i>',
+          label: "Aplicar",
+          callback: async (html) => {
+            const checked = html.find("input[type=checkbox]:checked").map((_, el) => el.name).get();
+            const unchecked = html.find("input[type=checkbox]:not(:checked)").map((_, el) => el.name).get();
+
+            for (const id of checked) {
+              await T20ConditionAutomation.applyCondition(actor, id);
+            }
+            for (const id of unchecked) {
+              await T20ConditionAutomation.removeCondition(actor, id);
+            }
+          },
+        },
+        cancel: { label: "Cancelar" },
+      },
+      render: (html) => {
+        html.find("#t20-condition-search").on("input", (ev) => {
+          const search = ev.currentTarget.value.toLowerCase();
+          html.find(".t20-condition-row").each((_, el) => {
+            const name = $(el).find(".t20-condition-name").text().toLowerCase();
+            $(el).toggle(name.includes(search));
+          });
+        });
+      },
+    }).render(true);
+  }
+
+  // ── Diálogo de Dano Manual ────────────────────────────────
+  static openManualDamageDialog(actor) {
+    new Dialog({
+      title: `Aplicar Dano: ${actor.name}`,
+      content: `
+        <div class="t20-damage-dialog">
+          <div class="t20-field">
+            <label>Valor de Dano</label>
+            <input type="number" id="t20-damage-value" min="0" value="0" />
+          </div>
+          <div class="t20-field">
+            <label>Tipo de Dano</label>
+            <select id="t20-damage-type">
+              <option value="">Nenhum</option>
+              <option value="corte">Corte</option>
+              <option value="perfuracao">Perfuração</option>
+              <option value="impacto">Impacto</option>
+              <option value="fogo">Fogo</option>
+              <option value="frio">Frio</option>
+              <option value="eletricidade">Eletricidade</option>
+              <option value="acido">Ácido</option>
+              <option value="sonic">Sônico</option>
+              <option value="negativo">Negativo</option>
+              <option value="positivo">Positivo</option>
+              <option value="mental">Mental</option>
+            </select>
+          </div>
+          <div class="t20-field-check">
+            <label>
+              <input type="checkbox" id="t20-is-critical" />
+              Dano Crítico (×${getSetting("criticalMultiplier")})
+            </label>
+          </div>
+          <div class="t20-hp-display">
+            PV atual: <strong>${actor.system?.hp?.value ?? actor.system?.pv?.value ?? "?"}</strong>
+          </div>
+        </div>
+      `,
+      buttons: {
+        apply: {
+          icon: '<i class="fas fa-heart-broken"></i>',
+          label: "Aplicar",
+          callback: async (html) => {
+            let damage = parseInt(html.find("#t20-damage-value").val()) || 0;
+            const type = html.find("#t20-damage-type").val();
+            const isCritical = html.find("#t20-is-critical").is(":checked");
+
+            if (isCritical) damage *= getSetting("criticalMultiplier");
+
+            await T20DamageAutomation._applyDamageToTarget(actor, damage, type, null);
+          },
+        },
+        roll: {
+          icon: '<i class="fas fa-dice"></i>',
+          label: "Rolar Fórmula",
+          callback: async (html) => {
+            const formula = await new Promise((resolve) => {
+              Dialog.prompt({
+                title: "Fórmula de Dano",
+                content: `<input type="text" id="t20-formula" value="1d6" />`,
+                callback: (h) => resolve(h.find("#t20-formula").val()),
+              });
+            });
+            if (!formula) return;
+            const roll = await new Roll(formula).evaluate();
+            await T20DamageAutomation._applyDamageToTarget(actor, roll.total, null, null);
+          },
+        },
+        cancel: { label: "Cancelar" },
+      },
+    }).render(true);
+  }
+
+  // ── Diálogo de Cura ───────────────────────────────────────
+  static openHealDialog(actor) {
+    new Dialog({
+      title: `Curar: ${actor.name}`,
+      content: `
+        <div class="t20-heal-dialog">
+          <div class="t20-field">
+            <label>Valor de Cura</label>
+            <input type="number" id="t20-heal-value" min="0" value="0" />
+          </div>
+          <div class="t20-hp-display">
+            PV atual: <strong>${actor.system?.hp?.value ?? actor.system?.pv?.value ?? "?"}</strong> /
+            <strong>${actor.system?.hp?.max ?? actor.system?.pv?.max ?? "?"}</strong>
+          </div>
+        </div>
+      `,
+      buttons: {
+        apply: {
+          icon: '<i class="fas fa-heart"></i>',
+          label: "Curar",
+          callback: async (html) => {
+            const heal = parseInt(html.find("#t20-heal-value").val()) || 0;
+            const { T20DamageAutomation: DA } = await import("./damage-automation.js");
+            const hpPath = DA._getHpPath(actor);
+            const currentHp = foundry.utils.getProperty(actor.system, hpPath + ".value");
+            const maxHp = foundry.utils.getProperty(actor.system, hpPath + ".max");
+            const newHp = Math.min(maxHp, currentHp + heal);
+            await actor.update({ [`system.${hpPath}.value`]: newHp });
+            ChatMessage.create({
+              content: `💚 <strong>${actor.name}</strong> recuperou <strong>${heal} PV</strong>! (${currentHp} → ${newHp})`,
+              speaker: ChatMessage.getSpeaker({ actor }),
+            });
+          },
+        },
+        cancel: { label: "Cancelar" },
+      },
+    }).render(true);
+  }
+
+  // ── HUD Rápido ────────────────────────────────────────────
+  static openQuickDamageHUD(actor, hudHtml) {
+    const quickPanel = $(`
+      <div class="t20-quick-damage-hud">
+        <input type="number" class="t20-quick-input" placeholder="Dano" min="0" />
+        <button class="t20-quick-apply" title="Aplicar Dano"><i class="fas fa-check"></i></button>
+        <button class="t20-quick-heal" title="Curar"><i class="fas fa-heart"></i></button>
+      </div>
+    `);
+
+    quickPanel.find(".t20-quick-apply").click(async () => {
+      const val = parseInt(quickPanel.find(".t20-quick-input").val()) || 0;
+      await T20DamageAutomation._applyDamageToTarget(actor, val, null, null);
+      quickPanel.remove();
+    });
+
+    quickPanel.find(".t20-quick-heal").click(async () => {
+      const val = parseInt(quickPanel.find(".t20-quick-input").val()) || 0;
+      const { T20DamageAutomation: DA } = await import("./damage-automation.js");
+      const hpPath = DA._getHpPath(actor);
+      const currentHp = foundry.utils.getProperty(actor.system, hpPath + ".value");
+      const maxHp = foundry.utils.getProperty(actor.system, hpPath + ".max");
+      await actor.update({ [`system.${hpPath}.value`]: Math.min(maxHp, currentHp + val) });
+      quickPanel.remove();
+    });
+
+    hudHtml.find(".left").append(quickPanel);
+  }
+
+  // ── Mostra condições ativas ───────────────────────────────
+  static showActiveConditions(actor) {
+    const activeConditions = actor.effects.filter(
+      (e) => e.flags?.[MODULE_ID]?.isT20Condition
+    );
+
+    const content = activeConditions.length
+      ? activeConditions.map((e) => {
+          const condId = e.flags[MODULE_ID].conditionId;
+          const cond = T20_CONDITIONS[condId];
+          return `
+            <div class="t20-active-condition">
+              <img src="${e.icon}" class="t20-condition-icon" />
+              <div>
+                <strong>${e.label}</strong>
+                <ul>${cond?.effects.map((ef) => `<li>${ef}</li>`).join("") ?? ""}</ul>
+              </div>
+            </div>
+          `;
+        }).join("")
+      : "<p><em>Nenhuma condição ativa.</em></p>";
+
+    new Dialog({
+      title: `Condições: ${actor.name}`,
+      content: `<div class="t20-conditions-view">${content}</div>`,
+      buttons: { close: { label: "Fechar" } },
+    }).render(true);
+  }
+}

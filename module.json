@@ -1,0 +1,464 @@
+/* ============================================================
+   Tormenta20 Attack Automation - Estilos
+   ============================================================ */
+
+:root {
+  --t20-red: #8b1a1a;
+  --t20-red-light: #c0392b;
+  --t20-gold: #c9a227;
+  --t20-dark: #1a1a2e;
+  --t20-darker: #0f0f1a;
+  --t20-text: #e8d5b7;
+  --t20-green: #2d7a2d;
+  --t20-green-light: #27ae60;
+  --t20-blue: #1a4a8a;
+  --t20-border: #5a3a1a;
+  --t20-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+}
+
+/* ── Cards de Ataque ────────────────────────────────────── */
+.t20-attack-card {
+  background: linear-gradient(135deg, var(--t20-darker) 0%, var(--t20-dark) 100%);
+  border: 2px solid var(--t20-border);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--t20-text);
+  font-family: "MedievalSharp", "Palatino Linotype", serif;
+  box-shadow: var(--t20-shadow);
+}
+
+.t20-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--t20-border);
+  margin-bottom: 10px;
+}
+
+.t20-item-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  border: 1px solid var(--t20-gold);
+  object-fit: cover;
+}
+
+.t20-card-title {
+  display: flex;
+  flex-direction: column;
+}
+
+.t20-item-name {
+  font-size: 1em;
+  font-weight: bold;
+  color: var(--t20-gold);
+}
+
+.t20-card-subtitle {
+  font-size: 0.75em;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Resultado do Ataque ─────────────────────────────────── */
+.t20-attack-result {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.t20-roll-formula {
+  font-size: 0.75em;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.t20-roll-total {
+  font-size: 2em;
+  font-weight: bold;
+  color: var(--t20-gold);
+  text-align: center;
+  text-shadow: 0 0 10px rgba(201, 162, 39, 0.5);
+}
+
+.t20-roll-total.critical {
+  color: #ff6b35;
+  text-shadow: 0 0 15px rgba(255, 107, 53, 0.7);
+  animation: t20-pulse 0.5s ease-in-out 3;
+}
+
+/* ── Resultado por Alvo ──────────────────────────────────── */
+.t20-target-results {
+  margin-top: 8px;
+}
+
+.t20-target-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 4px solid #555;
+}
+
+.t20-target-row.hit {
+  border-left-color: var(--t20-green);
+  background: rgba(45, 122, 45, 0.1);
+}
+
+.t20-target-row.miss {
+  border-left-color: #555;
+  background: rgba(85, 85, 85, 0.1);
+}
+
+.t20-target-row.critical {
+  border-left-color: #ff6b35;
+  background: rgba(255, 107, 53, 0.15);
+}
+
+.t20-target-row.miss.natural {
+  border-left-color: #333;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.t20-target-img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--t20-border);
+  object-fit: cover;
+}
+
+.t20-hit-label {
+  margin-left: auto;
+  font-size: 0.8em;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.t20-target-row.critical .t20-hit-label { color: #ff6b35; }
+.t20-target-row.hit .t20-hit-label { color: #27ae60; }
+.t20-target-row.miss .t20-hit-label { color: #e74c3c; }
+
+/* ── Cards de Dano ───────────────────────────────────────── */
+.t20-damage-card {
+  background: linear-gradient(135deg, #1a0a0a 0%, #2d1010 100%);
+  border: 2px solid #5a1a1a;
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--t20-text);
+  box-shadow: var(--t20-shadow);
+}
+
+.t20-damage-card.critical {
+  border-color: #ff6b35;
+  background: linear-gradient(135deg, #1a0800 0%, #3d1500 100%);
+}
+
+.t20-damage-result {
+  text-align: center;
+  padding: 10px 0;
+}
+
+.t20-damage-type {
+  font-size: 0.75em;
+  color: #aaa;
+  text-transform: capitalize;
+  margin-top: 4px;
+}
+
+/* ── Botões de Dano ──────────────────────────────────────── */
+.t20-damage-buttons {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.t20-apply-damage,
+.t20-apply-half-damage {
+  flex: 1;
+  padding: 5px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--t20-border);
+  cursor: pointer;
+  font-size: 0.8em;
+  transition: all 0.2s;
+}
+
+.t20-apply-damage {
+  background: var(--t20-red);
+  color: white;
+}
+
+.t20-apply-damage:hover { background: var(--t20-red-light); }
+
+.t20-apply-half-damage {
+  background: #2c3e50;
+  color: white;
+}
+
+.t20-apply-half-damage:hover { background: #3d5166; }
+
+/* ── Dados visuais ───────────────────────────────────────── */
+.t20-roll-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.t20-die-results {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.t20-die-label {
+  font-size: 0.7em;
+  color: #888;
+}
+
+.t20-die-result {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 0.8em;
+  font-weight: bold;
+}
+
+.t20-die-result.max { background: rgba(255, 107, 53, 0.3); border-color: #ff6b35; color: #ff6b35; }
+.t20-die-result.min { background: rgba(100, 100, 100, 0.2); border-color: #666; color: #888; }
+
+/* ── Condições ───────────────────────────────────────────── */
+.t20-condition-applied {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(139, 26, 26, 0.2);
+  border: 1px solid var(--t20-red);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: var(--t20-text);
+}
+
+.t20-condition-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.t20-condition-effects {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  font-size: 0.8em;
+  color: #aaa;
+}
+
+.t20-condition-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  margin-bottom: 2px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.t20-condition-row:hover { background: rgba(255, 255, 255, 0.05); }
+.t20-condition-row.active { background: rgba(139, 26, 26, 0.2); border-left: 3px solid var(--t20-red); }
+
+.t20-condition-name {
+  font-weight: bold;
+  min-width: 100px;
+}
+
+.t20-condition-desc {
+  font-size: 0.78em;
+  color: #888;
+}
+
+/* ── Painel ──────────────────────────────────────────────── */
+.t20-panel {
+  min-width: 300px;
+}
+
+.t20-panel-section {
+  margin-bottom: 16px;
+}
+
+.t20-panel-section h3 {
+  color: var(--t20-gold);
+  border-bottom: 1px solid var(--t20-border);
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+}
+
+.t20-actor-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.t20-actor-img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.t20-hp {
+  margin-left: auto;
+  font-size: 0.85em;
+  color: #aaa;
+}
+
+.t20-action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.t20-btn {
+  padding: 8px 12px;
+  border-radius: 5px;
+  border: 1px solid var(--t20-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--t20-text);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.85em;
+}
+
+.t20-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.t20-btn.danger { border-color: var(--t20-red); }
+.t20-btn.danger:hover { background: rgba(139, 26, 26, 0.3); }
+.t20-btn.warning { border-color: #e67e22; }
+.t20-btn.warning:hover { background: rgba(230, 126, 34, 0.2); }
+
+/* ── HUD Rápido ──────────────────────────────────────────── */
+.t20-quick-damage-hud {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 4px;
+  padding: 4px;
+  margin-top: 4px;
+}
+
+.t20-quick-input {
+  width: 60px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid #555;
+  border-radius: 3px;
+  color: white;
+  font-size: 0.9em;
+  padding: 2px 4px;
+}
+
+.t20-quick-apply,
+.t20-quick-heal {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.t20-quick-apply { background: var(--t20-red); color: white; }
+.t20-quick-heal { background: var(--t20-green); color: white; }
+
+/* ── Notificações ────────────────────────────────────────── */
+.t20-applied {
+  color: var(--t20-green-light);
+  font-size: 0.85em;
+}
+
+.t20-notice {
+  background: rgba(230, 126, 34, 0.15);
+  border-left: 3px solid #e67e22;
+  padding: 6px 10px;
+  border-radius: 3px;
+  font-size: 0.85em;
+}
+
+.t20-bleeding {
+  background: rgba(139, 26, 26, 0.2);
+  border-left: 3px solid #e74c3c;
+  padding: 6px 10px;
+  border-radius: 3px;
+}
+
+/* ── Salvamento ──────────────────────────────────────────── */
+.t20-save-card {
+  padding: 10px 14px;
+  border-radius: 6px;
+  border-left: 4px solid #555;
+}
+
+.t20-save-card.success { border-color: var(--t20-green); background: rgba(45, 122, 45, 0.1); }
+.t20-save-card.failure { border-color: var(--t20-red); background: rgba(139, 26, 26, 0.1); }
+
+.t20-save-result { font-size: 0.85em; color: #aaa; margin: 4px 0; }
+.t20-save-outcome { font-weight: bold; font-size: 1.1em; }
+.t20-save-card.success .t20-save-outcome { color: var(--t20-green-light); }
+.t20-save-card.failure .t20-save-outcome { color: #e74c3c; }
+
+/* ── Diálogos ────────────────────────────────────────────── */
+.t20-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.t20-field label {
+  font-size: 0.85em;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.t20-field-check {
+  margin-bottom: 12px;
+}
+
+.t20-hp-display {
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  font-size: 0.9em;
+  text-align: center;
+}
+
+.t20-search-bar { margin-bottom: 8px; }
+.t20-search-bar input { width: 100%; padding: 6px 10px; border-radius: 4px; }
+
+.t20-damage-confirm p { margin: 6px 0; }
+
+/* ── Animações ───────────────────────────────────────────── */
+@keyframes t20-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}

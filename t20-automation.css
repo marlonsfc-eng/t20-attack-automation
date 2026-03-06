@@ -1,0 +1,308 @@
+// ============================================================
+// Tormenta20 Attack Automation - damage-automation.js
+// Automação de rolagens e aplicação de dano
+// ============================================================
+
+import { MODULE_ID, getSetting, emitSocket } from "./hooks.js";
+
+export class T20DamageAutomation {
+
+  // ── Rola e aplica dano para um alvo ──────────────────────
+  static async rollAndApplyDamage(actor, item, targetActor, isCritical = false) {
+    const damageFormula = this._getDamageFormula(item, isCritical);
+    if (!damageFormula) return;
+
+    const roll = await new Roll(damageFormula, actor.getRollData()).evaluate();
+
+    const damageType = this._getDamageType(item);
+    const totalDamage = roll.total;
+
+    const mode = getSetting("autoDamageApplication");
+
+    if (mode === "none") {
+      // Apenas mostrar no chat
+      await this._createDamageCard(actor, item, roll, targetActor, isCritical, damageType);
+      return;
+    }
+
+    if (mode === "ask") {
+      const confirmed = await this._confirmDamageDialog(
+        totalDamage,
+        damageType,
+        targetActor,
+        isCritical
+      );
+      if (!confirmed) return;
+    }
+
+    // Aplicar o dano
+    await this._applyDamageToTarget(targetActor, totalDamage, damageType, item);
+    await this._createDamageCard(actor, item, roll, targetActor, isCritical, damageType, true);
+  }
+
+  // ── Diálogo de confirmação ────────────────────────────────
+  static async _confirmDamageDialog(damage, type, target, isCritical) {
+    return new Promise((resolve) => {
+      new Dialog({
+        title: "Aplicar Dano?",
+        content: `
+          <div class="t20-damage-confirm">
+            <p>${isCritical ? "⚔️ CRÍTICO! " : ""}Aplicar <strong>${damage} de dano${type ? ` (${type})` : ""}</strong> em <strong>${target.name}</strong>?</p>
+            <p>PV atual: <strong>${target.system?.hp?.value ?? target.system?.pv?.value ?? "?"}</strong></p>
+          </div>
+        `,
+        buttons: {
+          yes: {
+            icon: '<i class="fas fa-check"></i>',
+            label: "Aplicar",
+            callback: () => resolve(true),
+          },
+          no: {
+            icon: '<i class="fas fa-times"></i>',
+            label: "Cancelar",
+            callback: () => resolve(false),
+          },
+          half: {
+            icon: '<i class="fas fa-shield-alt"></i>',
+            label: "Metade (Resistência)",
+            callback: () => {
+              // Resolve com metade do dano sinalizado de forma diferente
+              resolve("half");
+            },
+          },
+        },
+        default: "yes",
+      }).render(true);
+    });
+  }
+
+  // ── Aplica dano diretamente no ator ──────────────────────
+  static async _applyDamageToTarget(targetActor, damage, damageType, item) {
+    // Suporte a diferentes estruturas de dados do T20
+    const hpPath = this._getHpPath(targetActor);
+    const currentHp = foundry.utils.getProperty(targetActor.system, hpPath + ".value");
+    const maxHp = foundry.utils.getProperty(targetActor.system, hpPath + ".max");
+
+    if (currentHp === undefined) {
+      ui.notifications.warn(`Não foi possível encontrar PV de ${targetActor.name}`);
+      return;
+    }
+
+    // Verificar redução de dano / resistências
+    const reducedDamage = await this._applyDamageReduction(targetActor, damage, damageType);
+    const finalDamage = Math.max(0, reducedDamage);
+
+    const newHp = Math.max(0, currentHp - finalDamage);
+
+    // Verificar se é GM ou tem permissão
+    if (targetActor.isOwner || game.user.isGM) {
+      await targetActor.update({
+        [`system.${hpPath}.value`]: newHp,
+      });
+    } else {
+      // Emitir para GM aplicar
+      emitSocket("applyDamage", {
+        actorId: targetActor.id,
+        tokenId: targetActor.token?.id,
+        damage: finalDamage,
+        hpPath,
+        newHp,
+      });
+    }
+
+    // Verificar condições por dano (sangramento, incapacitação)
+    await this._checkDamageConditions(targetActor, newHp, maxHp, finalDamage);
+
+    console.log(
+      `${MODULE_ID} | Dano aplicado: ${finalDamage} em ${targetActor.name} (${currentHp} → ${newHp})`
+    );
+  }
+
+  // ── Aplica redução de dano / resistências ─────────────────
+  static async _applyDamageReduction(actor, damage, damageType) {
+    // Verificar RD (Redução de Dano) do T20
+    const rd = actor.system?.attributes?.rd?.value ?? actor.system?.rd?.value ?? 0;
+
+    // Verificar imunidades
+    const immunities = actor.system?.traits?.di?.value ?? actor.system?.imunidades ?? [];
+    if (damageType && immunities.includes(damageType)) {
+      ui.notifications.info(`${actor.name} é imune a dano de ${damageType}!`);
+      return 0;
+    }
+
+    // Verificar resistências (metade do dano)
+    const resistances = actor.system?.traits?.dr?.value ?? actor.system?.resistencias ?? [];
+    if (damageType && resistances.includes(damageType)) {
+      ui.notifications.info(`${actor.name} é resistente a ${damageType} (metade do dano)!`);
+      return Math.floor(damage / 2);
+    }
+
+    // Aplicar RD
+    return Math.max(0, damage - rd);
+  }
+
+  // ── Verifica condições causadas por dano ──────────────────
+  static async _checkDamageConditions(actor, newHp, maxHp, damage) {
+    const { T20ConditionAutomation } = await import("./condition-automation.js");
+
+    // Incapacitado (0 PV)
+    if (newHp <= 0) {
+      await T20ConditionAutomation.applyCondition(actor, "unconscious");
+    }
+
+    // Criticamente ferido (menos de metade dos PV)
+    if (newHp <= maxHp / 2 && newHp > 0) {
+      // Verificar sangrando (regra opcional do T20)
+      const hasBleeding = actor.statuses?.has("bleeding") ?? false;
+      if (!hasBleeding && getSetting("enableConditionAutomation")) {
+        // Mostrar sugestão, não aplicar automaticamente
+        ChatMessage.create({
+          content: `<p class="t20-notice">⚠️ <strong>${actor.name}</strong> está com menos de metade dos PV. Considere aplicar a condição <em>Sangrando</em> se aplicável.</p>`,
+          whisper: [game.users.find((u) => u.isGM)?.id].filter(Boolean),
+        });
+      }
+    }
+  }
+
+  // ── Cria card de dano no chat ─────────────────────────────
+  static async _createDamageCard(actor, item, roll, target, isCritical, damageType, applied = false) {
+    const content = `
+      <div class="t20-damage-card ${isCritical ? "critical" : ""}">
+        <div class="t20-card-header">
+          <img src="${item.img}" class="t20-item-img" />
+          <div class="t20-card-title">
+            <span class="t20-item-name">${item.name}</span>
+            <span class="t20-card-subtitle">${isCritical ? "⚔️ Dano Crítico" : "Dano"}</span>
+          </div>
+        </div>
+        <div class="t20-damage-result">
+          <div class="t20-roll-formula">${roll.formula}</div>
+          <div class="t20-roll-total ${isCritical ? "critical" : ""}">${roll.total}</div>
+          ${damageType ? `<div class="t20-damage-type">${damageType}</div>` : ""}
+        </div>
+        ${target ? `
+        <div class="t20-target-info">
+          <span>Alvo: <strong>${target.name}</strong></span>
+          ${applied ? '<span class="t20-applied">✓ Dano aplicado</span>' : ""}
+        </div>
+        ` : ""}
+        <div class="t20-roll-breakdown">
+          ${roll.dice.map((d) => `
+            <div class="t20-die-results">
+              <span class="t20-die-label">d${d.faces}:</span>
+              ${d.results.map((r) => `
+                <span class="t20-die-result ${r.result === d.faces ? "max" : r.result === 1 ? "min" : ""}">${r.result}</span>
+              `).join("")}
+            </div>
+          `).join("")}
+        </div>
+        ${!applied && target ? `
+        <div class="t20-damage-buttons">
+          <button class="t20-apply-damage" data-actor-id="${target.id}" data-damage="${roll.total}">
+            <i class="fas fa-heart-broken"></i> Aplicar ${roll.total} de Dano
+          </button>
+          <button class="t20-apply-half-damage" data-actor-id="${target.id}" data-damage="${Math.floor(roll.total / 2)}">
+            <i class="fas fa-shield-alt"></i> Metade (${Math.floor(roll.total / 2)})
+          </button>
+        </div>
+        ` : ""}
+      </div>
+    `;
+
+    const msg = await ChatMessage.create({
+      user: game.userId,
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content,
+      rolls: [roll],
+      flags: {
+        [MODULE_ID]: { type: "damageCard" },
+      },
+    });
+
+    return msg;
+  }
+
+  // ── Recebe dano via socket (para não-GMs) ─────────────────
+  static async applyDamageFromSocket(data) {
+    if (!game.user.isGM) return;
+
+    const actor =
+      game.actors.get(data.actorId) ??
+      canvas.tokens.get(data.tokenId)?.actor;
+
+    if (!actor) return;
+
+    await actor.update({
+      [`system.${this._getHpPath(actor)}.value`]: data.newHp,
+    });
+  }
+
+  // ── Helpers ───────────────────────────────────────────────
+  static _getDamageFormula(item, isCritical) {
+    const baseFormula =
+      item.system?.damage?.parts?.[0]?.[0] ??
+      item.system?.dano?.formula ??
+      item.system?.formula ??
+      null;
+
+    if (!baseFormula) return null;
+
+    if (isCritical) {
+      const multiplier = getSetting("criticalMultiplier");
+      // Dobra os dados: 1d8 → 2d8, etc.
+      return this._multiplyCriticalFormula(baseFormula, multiplier);
+    }
+
+    return baseFormula;
+  }
+
+  static _multiplyCriticalFormula(formula, multiplier) {
+    // Substitui XdY por (X*multiplier)dY
+    return formula.replace(/(\d+)d(\d+)/gi, (match, count, faces) => {
+      return `${parseInt(count) * multiplier}d${faces}`;
+    });
+  }
+
+  static _getDamageType(item) {
+    return (
+      item.system?.damage?.parts?.[0]?.[1] ??
+      item.system?.dano?.tipo ??
+      item.system?.damageType ??
+      null
+    );
+  }
+
+  static _getHpPath(actor) {
+    if (actor.system?.hp !== undefined) return "hp";
+    if (actor.system?.pv !== undefined) return "pv";
+    if (actor.system?.attributes?.hp !== undefined) return "attributes.hp";
+    return "hp";
+  }
+}
+
+// ── Listener para botões de dano no chat ──────────────────
+Hooks.on("renderChatMessage", (message, html, data) => {
+  html.find(".t20-apply-damage").click(async (ev) => {
+    const actorId = ev.currentTarget.dataset.actorId;
+    const damage = parseInt(ev.currentTarget.dataset.damage);
+    const actor = game.actors.get(actorId);
+    if (!actor) return;
+
+    await T20DamageAutomation._applyDamageToTarget(actor, damage, null, null);
+    $(ev.currentTarget).closest(".t20-damage-buttons").html(
+      `<span class="t20-applied">✓ ${damage} de dano aplicado em ${actor.name}</span>`
+    );
+  });
+
+  html.find(".t20-apply-half-damage").click(async (ev) => {
+    const actorId = ev.currentTarget.dataset.actorId;
+    const damage = parseInt(ev.currentTarget.dataset.damage);
+    const actor = game.actors.get(actorId);
+    if (!actor) return;
+
+    await T20DamageAutomation._applyDamageToTarget(actor, damage, null, null);
+    $(ev.currentTarget).closest(".t20-damage-buttons").html(
+      `<span class="t20-applied">✓ ${damage} de dano (metade) aplicado em ${actor.name}</span>`
+    );
+  });
+});

@@ -346,8 +346,23 @@ Hooks.on("createChatMessage", async (message, options, userId) => {
   const nomeItem  = nomeMatch?.[1] ?? "Habilidade";
   const imgItem   = imgMatch?.[1]  ?? "";
 
-  // CD do conjurador
-  const cd = actor.system?.attributes?.cd ?? 10;
+  // CD do conjurador: 15 + atributo de conjuração + bônus de onUseEffects
+  const atribConjuracao = actor.system?.attributes?.conjuracao ?? "int";
+  const valorAtrib = actor.system?.atributos?.[atribConjuracao]?.value ?? 0;
+
+  // Extrair bônus de CD dos efeitos ativos (ex: "Fortalecimento Arcano: +1 na CD de magias")
+  const onUseEffects = message.flags?.tormenta20?.onUseEffects ?? [];
+  let bonusCD = 0;
+  for (const efeito of onUseEffects) {
+    const desc = efeito.description ?? "";
+    // Procura padrões como "+1 na CD" ou "+2 na CD"
+    const match = desc.match(/\+(\d+)\s+na\s+CD/i);
+    if (match) {
+      bonusCD += parseInt(match[1]) * (parseInt(efeito.qty) || 1);
+    }
+  }
+
+  const cd = 15 + valorAtrib + bonusCD;
 
   // Dano da magia
   const rolls       = itemData?.rolls ?? [];
@@ -385,7 +400,7 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
         </div>
         <div style="margin-left:auto;text-align:center">
           <div style="font-size:0.7em;color:#aaa;text-transform:uppercase">CD</div>
-          <div style="font-size:1.6em;font-weight:bold;color:#e74c3c">${cd}</div>
+          <input type="number" class="t20-cd-input" value="${cd}" style="width:50px;text-align:center;font-size:1.3em;font-weight:bold;color:#e74c3c;background:transparent;border:1px solid #e74c3c33;border-radius:4px;padding:2px"/>
         </div>
       </div>
       <div style="font-size:0.85em;color:#aaa;margin-bottom:10px">
@@ -396,7 +411,7 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
       <button class="t20-salvar"
         data-salv-pericia="${salvPericia}"
         data-salv-label="${salvLabel}"
-        data-cd="${cd}"
+        data-cd="${cd}" class="t20-salvar"
         data-item="${nomeItem}"
         style="width:100%;padding:8px;border-radius:5px;cursor:pointer;font-size:0.95em;
           background:linear-gradient(135deg,#1a4a1a,#2a6a2a);
@@ -418,7 +433,9 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
 async function rolarSalvamento(btn) {
   const salvPericia = btn.dataset.salvPericia;
   const salvLabel   = btn.dataset.salvLabel;
-  const cd          = parseInt(btn.dataset.cd);
+  // Lê CD do input editável no card (GM pode ter ajustado)
+  const cdInput = btn.closest("div")?.querySelector(".t20-cd-input");
+  const cd = cdInput ? parseInt(cdInput.value) : parseInt(btn.dataset.cd);
   const nomeItem    = btn.dataset.item;
 
   const actor = canvas.tokens.controlled[0]?.actor ?? game.user.character;

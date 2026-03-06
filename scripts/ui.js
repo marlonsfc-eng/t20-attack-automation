@@ -1,8 +1,3 @@
-// ============================================================
-// Tormenta20 Attack Automation - attack-automation.js
-// Lógica principal de automação de ataques
-// ============================================================
-
 import { MODULE_ID, getSetting } from "./hooks.js";
 import { T20DamageAutomation } from "./damage-automation.js";
 import { T20ConditionAutomation } from "./condition-automation.js";

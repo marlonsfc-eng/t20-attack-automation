@@ -1,30 +1,36 @@
-// hooks.js - Tormenta20 Attack Automation v1.5
-// Suporte a múltiplos tipos de dano no mesmo roll
+// hooks.js - Tormenta20 Attack Automation v1.6
 
 Hooks.once("ready", () => {
-  console.log("T20 Attack Automation | v1.5 carregado!");
+  console.log("T20 Attack Automation | v1.6 carregado!");
   ui.notifications.info("⚔️ T20 Attack Automation ativo!");
 });
 
-// Extrai { tipo: total } de um roll com múltiplos tipos
-// Ex: "4d10[corte] + 12[corte] + 3d6[fogo]" → { corte: 32, fogo: 17 }
+// Extrai { tipo: total } ignorando operadores e termos sem valor numérico
 function extrairDanoPorTipo(roll) {
   const porTipo = {};
 
   for (const term of roll.terms) {
+    // Ignora operadores (+, -, etc) e parênteses
+    if (term.constructor?.name === "OperatorTerm") continue;
+    if (term.constructor?.name === "ParenthesisTerm") continue;
+
+    const valor = term.total;
+    // Ignora se não for número válido ou for zero sem dados
+    if (valor === undefined || valor === null || isNaN(valor)) continue;
+    // Ignora terms de dado que não rolaram nada
+    if (typeof valor !== "number") continue;
+
     const flavor = (term.flavor ?? term.options?.flavor ?? "").toLowerCase().trim();
     const tipo = flavor || "sem_tipo";
-    const valor = term.total ?? 0;
-    if (valor === 0 && term.constructor?.name === "OperatorTerm") continue;
+
     porTipo[tipo] = (porTipo[tipo] ?? 0) + valor;
   }
 
   return porTipo;
 }
 
-// Aplica resistências/imunidades/vulnerabilidades de um ator para um tipo de dano
-function calcularDanoComResistencias(danoValor, tipoNorm, tracos, rdGeral) {
-  let dano = danoValor;
+function calcularDanoComResistencias(valorBase, tipoNorm, tracos) {
+  let dano = valorBase;
   const notas = [];
 
   if (tipoNorm && tipoNorm !== "sem_tipo") {
@@ -35,20 +41,13 @@ function calcularDanoComResistencias(danoValor, tipoNorm, tracos, rdGeral) {
       }
       if (traco.vulnerabilidade) {
         dano *= 2;
-        notas.push(`vuln. ${tipoNorm}: ×2`);
+        notas.push(`vuln. ×2`);
       } else if (traco.value > 0) {
         const antes = dano;
         dano = Math.max(0, dano - traco.value);
-        notas.push(`RD ${traco.value} [${tipoNorm}]: ${antes}→${dano}`);
+        notas.push(`RD ${traco.value}: ${antes}→${dano}`);
       }
     }
-  }
-
-  // RD geral depois
-  if (rdGeral > 0 && dano > 0) {
-    const antes = dano;
-    dano = Math.max(0, dano - rdGeral);
-    notas.push(`RD ${rdGeral} geral: ${antes}→${dano}`);
   }
 
   return { dano, notas };
@@ -146,7 +145,7 @@ async function criarMensagemPublica(totalAtaque, dadosAlvos) {
 }
 
 async function criarMensagemGM(totalAtaque, dadosAlvos, danoPorTipo, danoTotal) {
-  const temDano = danoPorTipo !== null && danoPorTipo !== undefined;
+  const temDano = danoPorTipo && Object.keys(danoPorTipo).length > 0;
 
   let html = `
     <div style="background:linear-gradient(135deg,#0f0f1a,#1a1a2e);
@@ -161,23 +160,26 @@ async function criarMensagemGM(totalAtaque, dadosAlvos, danoPorTipo, danoTotal) 
     const cor = a.erroNatural ? "#555" : a.possivelCritico && a.acertou ? "#ff6b35" : a.acertou ? "#27ae60" : "#e74c3c";
     const label = a.erroNatural ? "💨 Erro Natural" : a.possivelCritico && a.acertou ? "⚔️ CRÍTICO!" : a.acertou ? "✅ Acertou" : "❌ Errou";
 
-    // Calcular dano por tipo com resistências
     let danoFinalTotal = 0;
     let linhasDano = [];
 
-    if (temDano) {
-      for (const [tipo, valor] of Object.entries(danoPorTipo)) {
-        const tipoNorm = tipo === "perfuração" ? "perfuracao" : tipo;
-        const mult = a.possivelCritico && a.acertou ? 2 : 1;
-        const valorCrit = valor * mult;
+    if (temDano && a.acertou) {
+      const isCrit = a.possivelCritico;
 
-        const { dano, notas } = calcularDanoComResistencias(valorCrit, tipoNorm, a.tracos, 0);
+      for (const [tipo, valor] of Object.entries(danoPorTipo)) {
+        // Ignora entradas sem valor real
+        if (isNaN(valor) || valor === null) continue;
+
+        const tipoNorm = tipo === "perfuração" ? "perfuracao" : tipo;
+        const valorCrit = isCrit ? valor * 2 : valor;
+
+        const { dano, notas } = calcularDanoComResistencias(valorCrit, tipoNorm, a.tracos);
         danoFinalTotal += dano;
 
         const notaStr = notas.length ? ` (${notas.join(", ")})` : "";
-        const critStr = mult === 2 ? ` ×2 crit` : "";
-        const tipoLabel = tipo !== "sem_tipo" ? tipo : "sem tipo";
-        const corLinha = dano === 0 ? "#888" : dano < valorCrit ? "#e67e22" : "#ccc";
+        const critStr = isCrit ? ` ×2` : "";
+        const tipoLabel = tipo !== "sem_tipo" ? tipo : "sem tipo específico";
+        const corLinha = dano === 0 ? "#666" : dano < valorCrit ? "#e67e22" : "#ccc";
 
         linhasDano.push(`
           <div style="font-size:0.82em;color:${corLinha};padding:2px 0">
@@ -185,12 +187,13 @@ async function criarMensagemGM(totalAtaque, dadosAlvos, danoPorTipo, danoTotal) 
           </div>`);
       }
 
-      // RD geral no final sobre o total
+      // RD geral aplicada ao total
       if (a.rdGeral > 0 && danoFinalTotal > 0) {
         const antes = danoFinalTotal;
         danoFinalTotal = Math.max(0, danoFinalTotal - a.rdGeral);
         linhasDano.push(`
-          <div style="font-size:0.82em;color:#aaa;padding:2px 0">
+          <div style="font-size:0.82em;color:#aaa;padding:2px 0;
+            border-top:1px solid rgba(255,255,255,0.08);margin-top:2px">
             RD geral ${a.rdGeral}: ${antes} → <b>${danoFinalTotal}</b>
           </div>`);
       }
@@ -211,7 +214,7 @@ async function criarMensagemGM(totalAtaque, dadosAlvos, danoPorTipo, danoTotal) 
         </div>
         <div style="font-size:0.8em;color:#888;margin-top:3px">
           DEF ${a.defesa} · PV ${a.pvAtual}/${a.pvMax}
-          ${a.rdGeral > 0 ? ` · RD ${a.rdGeral}` : ""}
+          ${a.rdGeral > 0 ? ` · RD geral ${a.rdGeral}` : ""}
           ${resInfo ? ` · ${resInfo}` : ""}
         </div>
         ${a.acertou && temDano ? `
@@ -219,7 +222,7 @@ async function criarMensagemGM(totalAtaque, dadosAlvos, danoPorTipo, danoTotal) 
           ${linhasDano.join("")}
           <div style="font-size:0.9em;font-weight:bold;color:#e8d5b7;margin-top:4px;
             border-top:1px solid rgba(255,255,255,0.1);padding-top:4px">
-            Total: ${danoFinalTotal}
+            Total final: ${danoFinalTotal}
           </div>
         </div>
         <div style="display:flex;gap:6px;margin-top:8px">

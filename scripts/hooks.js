@@ -294,3 +294,173 @@ async function aplicarDano(btn) {
   btn.closest("div").querySelectorAll("button")
     .forEach(b => { b.disabled = true; b.style.opacity = "0.5"; });
 }
+
+
+// ============================================================
+// SALVAMENTOS - Detecta magias/habilidades com teste de resistência
+// ============================================================
+
+// Mapa de perícias de salvamento para atributo e label
+const SALV_MAP = {
+  refl: { label: "Reflexos",  atributo: "des" },
+  fort: { label: "Fortitude", atributo: "con" },
+  vont: { label: "Vontade",   atributo: "sab" },
+  // fallback por texto
+  reflexos:   { label: "Reflexos",  atributo: "des" },
+  fortitude:  { label: "Fortitude", atributo: "con" },
+  vontade:    { label: "Vontade",   atributo: "sab" },
+};
+
+Hooks.on("createChatMessage", async (message, options, userId) => {
+  // Só processa quem enviou
+  if (userId !== game.userId) return;
+
+  // Verificar se é uma mensagem de uso de item com resistência
+  const itemId  = message.flags?.tormenta20?.itemId ?? message.flags?.itemId;
+  const actorId = message.speaker?.actor;
+  if (!itemId || !actorId) return;
+
+  const actor = game.actors.get(actorId);
+  if (!actor) return;
+
+  const item = actor.items.get(itemId);
+  if (!item) return;
+
+  const resistencia = item.system?.resistencia;
+  if (!resistencia) return;
+
+  // Detectar perícia de salvamento
+  const pericia = (resistencia.percia ?? resistencia.pericia ?? "").toLowerCase();
+  const txt     = (resistencia.txt ?? "").toLowerCase();
+
+  // Tentar identificar pelo campo pericia, senão pelo texto
+  let salvInfo = SALV_MAP[pericia];
+  if (!salvInfo) {
+    for (const [key, val] of Object.entries(SALV_MAP)) {
+      if (txt.includes(key)) { salvInfo = val; break; }
+    }
+  }
+  if (!salvInfo) return; // sem salvamento identificável
+
+  // CD do conjurador
+  const cd = actor.system?.attributes?.cd ?? 10;
+
+  // Efeito em caso de sucesso (extrair do txt)
+  const efeitoSucesso = txt || "reduz à metade";
+
+  // Tipo de dano da magia (para referência)
+  const rolls = item.system?.rolls ?? [];
+  const tipoDano = rolls[0]?.parts?.[0]?.[1] ?? "";
+  const formulaDano = rolls[0]?.parts?.[0]?.[0] ?? "";
+
+  await criarCartaoSalvamento({
+    nomeItem: item.name,
+    imgItem: item.img,
+    nomeConjurador: actor.name,
+    salvLabel: salvInfo.label,
+    salvAtributo: salvInfo.atributo,
+    cd,
+    efeitoSucesso,
+    tipoDano,
+    formulaDano,
+    messageId: message.id,
+  });
+});
+
+async function criarCartaoSalvamento(dados) {
+  const {
+    nomeItem, imgItem, nomeConjurador,
+    salvLabel, salvAtributo, cd,
+    efeitoSucesso, tipoDano, formulaDano
+  } = dados;
+
+  const html = `
+    <div style="
+      background:linear-gradient(135deg,#0a1a0a,#0f2a1a);
+      border:2px solid #1a6a2a;border-radius:8px;padding:12px;
+      color:#e8d5b7;font-family:'Palatino Linotype',serif;">
+      <div style="display:flex;align-items:center;gap:10px;
+        border-bottom:1px solid #1a6a2a;padding-bottom:8px;margin-bottom:10px">
+        <img src="${imgItem}" style="width:34px;height:34px;border-radius:4px;
+          border:1px solid #c9a227;object-fit:cover"/>
+        <div>
+          <div style="color:#c9a227;font-weight:bold">${nomeItem}</div>
+          <div style="font-size:0.78em;color:#888">por ${nomeConjurador}</div>
+        </div>
+        <div style="margin-left:auto;text-align:center">
+          <div style="font-size:0.7em;color:#aaa;text-transform:uppercase">CD</div>
+          <div style="font-size:1.6em;font-weight:bold;color:#e74c3c;
+            text-shadow:0 0 10px rgba(231,76,60,0.4)">${cd}</div>
+        </div>
+      </div>
+
+      <div style="font-size:0.85em;color:#aaa;margin-bottom:10px">
+        🎲 Teste de <b style="color:#e8d5b7">${salvLabel}</b> CD ${cd}
+        ${efeitoSucesso ? `<br><span style="font-size:0.9em">✅ Sucesso: ${efeitoSucesso}</span>` : ""}
+        ${formulaDano ? `<br><span style="font-size:0.9em">💥 Dano: ${formulaDano}${tipoDano ? ` [${tipoDano}]` : ""}</span>` : ""}
+      </div>
+
+      <button class="t20-salvar"
+        data-salv-atributo="${salvAtributo}"
+        data-salv-label="${salvLabel}"
+        data-cd="${cd}"
+        data-item="${nomeItem}"
+        style="width:100%;padding:8px;border-radius:5px;cursor:pointer;font-size:0.95em;
+          background:linear-gradient(135deg,#1a4a1a,#2a6a2a);
+          border:1px solid #3a8a3a;color:#fff;font-weight:bold">
+        🎲 Rolar ${salvLabel} (CD ${cd})
+      </button>
+    </div>`;
+
+  const novaMsg = await ChatMessage.create({ content: html });
+
+  Hooks.once("renderChatMessage", (msg, html) => {
+    if (msg.id !== novaMsg.id) return;
+    html[0].querySelectorAll(".t20-salvar").forEach(btn =>
+      btn.addEventListener("click", () => rolarSalvamento(btn))
+    );
+  });
+}
+
+async function rolarSalvamento(btn) {
+  const salvAtributo = btn.dataset.salvAtributo;
+  const salvLabel    = btn.dataset.salvLabel;
+  const cd           = parseInt(btn.dataset.cd);
+  const nomeItem     = btn.dataset.item;
+
+  // Pegar o personagem do jogador que clicou
+  const actor = canvas.tokens.controlled[0]?.actor ?? game.user.character;
+  if (!actor) return ui.notifications.warn("Selecione seu token antes de rolar!");
+
+  // Buscar valor da perícia de salvamento
+  const pericias = actor.system?.pericias ?? {};
+
+  // Mapa de atributo → chave da perícia no sistema T20
+  const atributoParaPericia = {
+    des: "refl",
+    con: "fort",
+    sab: "vont",
+  };
+
+  const chavePericia = atributoParaPericia[salvAtributo];
+  const pericia = pericias[chavePericia];
+  const valorPericia = pericia?.value ?? pericia?.outros ?? 0;
+  const atribBase = actor.system?.atributos?.[salvAtributo]?.value ?? 0;
+  const bonus = valorPericia + atribBase;
+
+  const roll = await new Roll(`1d20 + ${bonus}`).evaluate();
+  const sucesso = roll.total >= cd;
+
+  const cor = sucesso ? "#27ae60" : "#e74c3c";
+  const label = sucesso ? "✅ SUCESSO!" : "❌ FALHOU!";
+
+  await roll.toMessage({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    flavor: `
+      <div style="font-family:'Palatino Linotype',serif">
+        <b>${salvLabel}</b> contra <b>${nomeItem}</b> (CD ${cd})<br>
+        <span style="color:${cor};font-weight:bold;font-size:1.1em">${label}</span>
+        ${sucesso ? "<br><span style='font-size:0.85em;color:#aaa'>Efeito reduzido</span>" : ""}
+      </div>`,
+  });
+}

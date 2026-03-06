@@ -369,6 +369,10 @@ Hooks.on("createChatMessage", async (message, options, userId) => {
   const tipoDano    = rolls[0]?.parts?.[0]?.[1] ?? "";
   const formulaDano = rolls[0]?.parts?.[0]?.[0] ?? "";
 
+  // Dano já rolado na mesma mensagem
+  const rollDanoMagia = message.rolls?.find(r => !r.formula?.includes("d20"));
+  const danoRolado = rollDanoMagia?.total ?? null;
+
   await criarCartaoSalvamento({
     nomeItem,
     imgItem,
@@ -380,11 +384,12 @@ Hooks.on("createChatMessage", async (message, options, userId) => {
     efeitoSucesso: resistencia.txt,
     tipoDano,
     formulaDano,
+    danoRolado,
   });
 });
 
 async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
-    salvLabel, salvPericia, salvAtributo, cd, efeitoSucesso, tipoDano, formulaDano }) {
+    salvLabel, salvPericia, salvAtributo, cd, efeitoSucesso, tipoDano, formulaDano, danoRolado }) {
 
   const html = `
     <div style="
@@ -411,12 +416,14 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
       <button class="t20-salvar"
         data-salv-pericia="${salvPericia}"
         data-salv-label="${salvLabel}"
-        data-cd="${cd}" class="t20-salvar"
+        data-cd="${cd}"
         data-item="${nomeItem}"
+        data-dano="${danoRolado ?? 0}"
+        data-tipo-dano="${tipoDano}"
         style="width:100%;padding:8px;border-radius:5px;cursor:pointer;font-size:0.95em;
           background:linear-gradient(135deg,#1a4a1a,#2a6a2a);
           border:1px solid #3a8a3a;color:#fff;font-weight:bold">
-        🎲 Rolar ${salvLabel} (CD ${cd})
+        🎲 Rolar ${salvLabel} (CD ${cd})${danoRolado ? ` — Dano: ${danoRolado}` : ""}
       </button>
     </div>`;
 
@@ -433,23 +440,73 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
 async function rolarSalvamento(btn) {
   const salvPericia = btn.dataset.salvPericia;
   const salvLabel   = btn.dataset.salvLabel;
-  // Lê CD do input editável no card (GM pode ter ajustado)
-  const cdInput = btn.closest("div")?.querySelector(".t20-cd-input");
-  const cd = cdInput ? parseInt(cdInput.value) : parseInt(btn.dataset.cd);
+  const cdInput     = btn.closest("div")?.querySelector(".t20-cd-input");
+  const cd          = cdInput ? parseInt(cdInput.value) : parseInt(btn.dataset.cd);
   const nomeItem    = btn.dataset.item;
+  const danoBase    = parseInt(btn.dataset.dano) || 0;
+  const tipoDano    = (btn.dataset.tipoDano ?? "").toLowerCase();
 
   const actor = canvas.tokens.controlled[0]?.actor ?? game.user.character;
   if (!actor) return ui.notifications.warn("Selecione seu token antes de rolar!");
 
-  // Pegar valor da perícia de salvamento diretamente (já inclui atributo+treinamento)
   const pericias = actor.system?.pericias ?? {};
   const pericia  = pericias[salvPericia];
   const bonus    = pericia?.value ?? 0;
 
-  const roll = await new Roll(`1d20 + ${bonus}`).evaluate();
+  const roll    = await new Roll(`1d20 + ${bonus}`).evaluate();
   const sucesso = roll.total >= cd;
   const cor     = sucesso ? "#27ae60" : "#e74c3c";
   const label   = sucesso ? "✅ SUCESSO!" : "❌ FALHOU!";
+
+  let danoFinal = sucesso ? Math.floor(danoBase / 2) : danoBase;
+  let notaDano  = "";
+
+  if (danoBase > 0) {
+    const tracos  = actor.system?.tracos?.resistencias ?? {};
+    const tipoNorm = tipoDano || null;
+    const traco   = tipoNorm ? tracos?.[tipoNorm] : null;
+
+    if (traco?.imunidade) {
+      danoFinal = 0;
+      notaDano  = `Imune a ${tipoDano}! Nenhum dano.`;
+    } else {
+      if (traco?.vulnerabilidade) {
+        danoFinal *= 2;
+        notaDano += ` (vuln. ${tipoDano}: ×2)`;
+      } else if (traco?.value > 0) {
+        const antes = danoFinal;
+        danoFinal   = Math.max(0, danoFinal - parseInt(traco.value));
+        notaDano   += ` (RD ${traco.value} [${tipoDano}]: ${antes}→${danoFinal})`;
+      }
+
+      const rdGeral = parseInt(tracos?.dano?.value) || parseInt(tracos?.dano?.base) || 0;
+      if (rdGeral > 0 && danoFinal > 0) {
+        const antes = danoFinal;
+        danoFinal   = Math.max(0, danoFinal - rdGeral);
+        notaDano   += ` (RD geral ${rdGeral}: ${antes}→${danoFinal})`;
+      }
+
+      const prefixo = sucesso
+        ? `Sucesso! Dano reduzido: ${danoBase}→${Math.floor(danoBase/2)}`
+        : `Falhou! Dano total: ${danoBase}`;
+      notaDano = prefixo + notaDano;
+
+      if (danoFinal > 0) {
+        const hpPath  = "system.attributes.pv.value";
+        const pvAtual = foundry.utils.getProperty(actor, hpPath);
+        const pvMax   = foundry.utils.getProperty(actor, "system.attributes.pv.max") ?? pvAtual;
+        if (pvAtual !== undefined) {
+          const novoPV = Math.max(0, pvAtual - danoFinal);
+          await actor.update({ [hpPath]: novoPV });
+          const corPV = novoPV === 0 ? "red" : novoPV <= pvMax / 2 ? "orange" : "green";
+          notaDano += `<br>💔 ${danoFinal} de dano. PV: ${pvAtual} → <span style="color:${corPV}"><b>${novoPV}</b></span>`;
+          if (novoPV === 0) notaDano += "<br>💀 <b>Incapacitado!</b>";
+        }
+      } else {
+        notaDano += "<br>Nenhum dano aplicado.";
+      }
+    }
+  }
 
   await roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
@@ -457,7 +514,11 @@ async function rolarSalvamento(btn) {
       <div style="font-family:'Palatino Linotype',serif">
         <b>${salvLabel}</b> contra <i>${nomeItem}</i> (CD ${cd})<br>
         <span style="color:${cor};font-weight:bold;font-size:1.1em">${label}</span>
-        ${sucesso ? "<br><span style='font-size:0.85em;color:#aaa'>Efeito reduzido</span>" : ""}
+        ${notaDano ? `<br><span style="font-size:0.85em;color:#ccc">${notaDano}</span>` : ""}
       </div>`,
   });
+
+  btn.disabled      = true;
+  btn.style.opacity = "0.5";
+  btn.textContent   = label + " (feito)";
 }

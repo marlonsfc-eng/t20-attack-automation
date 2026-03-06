@@ -508,17 +508,30 @@ async function rolarSalvamento(btn) {
     }
   }
 
+  // Mensagem da rolagem (limpa, só o resultado do dado)
   await roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: `
-      <div style="font-family:'Palatino Linotype',serif">
-        <b>${salvLabel}</b> contra <i>${nomeItem}</i> (CD ${cd})<br>
-        <span style="color:${cor};font-weight:bold;font-size:1.1em">${label}</span>
-        ${notaDano ? `<br><span style="font-size:0.85em;color:#ccc">${notaDano}</span>` : ""}
-      </div>`,
+    flavor: `<b>${salvLabel}</b> contra <i>${nomeItem}</i> (CD ${cd})`,
   });
 
-  btn.disabled      = true;
-  btn.style.opacity = "0.5";
-  btn.textContent   = label + " (feito)";
+  // Mensagem separada com resultado e dano aplicado
+  const msgConteudo = `
+    <div style="
+      background:${sucesso ? "rgba(39,174,96,0.12)" : "rgba(231,76,60,0.12)"};
+      border-left:4px solid ${cor};border-radius:0 6px 6px 0;
+      padding:8px 12px;font-family:'Palatino Linotype',serif;color:#e8d5b7">
+      <div style="font-weight:bold;font-size:1.05em;color:${cor};margin-bottom:4px">
+        ${label} — ${actor.name}
+      </div>
+      <div style="font-size:0.88em;color:#ccc">
+        ${notaDano.replace(/<br>/g, "<br>")}
+      </div>
+    </div>`;
+
+  await ChatMessage.create({
+    content: msgConteudo,
+    speaker: ChatMessage.getSpeaker({ actor }),
+  });
+
+  // NÃO desabilita o botão — outros jogadores podem precisar rolar também
 }

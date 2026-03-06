@@ -227,7 +227,6 @@ async function criarMensagemPublica(totalAtaque, dadosAlvos) {
   await ChatMessage.create({ content: html });
 }
 
-// Mensagem privada do GM (com PV/Defesa e botões)
 async function criarMensagemGM(totalAtaque, dadosAlvos, danoBase, flavorDano, danoPorTipoArr = [], danoDesconhecido = 0) {
   const temDano = danoBase !== null && danoBase !== undefined;
 
@@ -267,11 +266,12 @@ async function criarMensagemGM(totalAtaque, dadosAlvos, danoBase, flavorDano, da
       .join(" · ");
 
     // Calcular dano final (multi-tipo) e notas
-    let danoFinal = 0;
+    let danoAntes = 0; // soma ANTES da RD geral
     let notasRes = [];
     let breakdown = [];
 
     if (temDano) {
+      // 1) Aplica RD/imunidade/vulnerabilidade por tipo
       for (const parte of (danoPorTipoArr ?? [])) {
         const tipo = normalizarTipo(parte.tipo);
         let parcial = Number(parte.valor ?? 0);
@@ -279,46 +279,59 @@ async function criarMensagemGM(totalAtaque, dadosAlvos, danoBase, flavorDano, da
         const traco = tipo ? a.tracos?.[tipo] : null;
 
         if (traco?.imunidade) {
-          breakdown.push(`${tipo}: ${parcial}→0`);
+          breakdown.push(`${tipo}: ${parcial}→0 (imune)`);
           notasRes.push(`${tipo}: imune`);
           parcial = 0;
         } else {
+          // vulnerabilidade
           if (traco?.vulnerabilidade) {
             const antes = parcial;
             parcial = parcial * 2;
-            breakdown.push(`${tipo}: ${antes}→${parcial}`);
+            breakdown.push(`${tipo}: ${antes}→${parcial} (vuln)`);
             notasRes.push(`${tipo}: vulnerável ×2`);
-          } else {
-            breakdown.push(`${tipo}: ${parcial}`);
           }
 
+          // RD específica do tipo
           if ((traco?.value ?? 0) > 0 && parcial > 0) {
             const rdEsp = traco.value;
             const antes = parcial;
             parcial = Math.max(0, parcial - rdEsp);
-            notasRes.push(`${tipo}: RD ${rdEsp} (${antes}→${parcial})`);
+            breakdown.push(`${tipo}: ${antes}→${parcial} (RD ${rdEsp})`);
+            notasRes.push(`${tipo}: RD ${rdEsp}`);
+          } else if (!traco?.vulnerabilidade) {
+            // sem ajuste, só mostra o valor
+            breakdown.push(`${tipo}: ${parcial}`);
           }
         }
 
-        danoFinal += parcial;
+        danoAntes += parcial;
       }
 
+      // 2) Adiciona dano sem tipo
       if ((danoDesconhecido ?? 0) !== 0) {
-        danoFinal += Number(danoDesconhecido);
-        breakdown.push(`sem tipo: ${danoDesconhecido}`);
+        const semTipo = Number(danoDesconhecido);
+        danoAntes += semTipo;
+        breakdown.push(`sem tipo: ${semTipo}`);
         notasRes.push(`sem tipo: sem ajuste`);
       }
 
-      // RD geral UMA VEZ no total final
-      if (a.rdGeral > 0 && danoFinal > 0) {
-        const antes = danoFinal;
-        danoFinal = Math.max(0, danoFinal - a.rdGeral);
-        notasRes.push(`RD geral ${a.rdGeral}: ${antes}→${danoFinal}`);
+      // 3) RD geral UMA VEZ no total acumulado
+      let danoFinal = danoAntes;
+      if (a.rdGeral > 0 && danoAntes > 0) {
+        danoFinal = Math.max(0, danoAntes - a.rdGeral);
+        notasRes.push(`RD geral ${a.rdGeral}: ${danoAntes}→${danoFinal}`);
       }
+
+      // Guarda o dano final calculado para os botões
+      a._danoFinalCalculado = danoFinal;
+    } else {
+      a._danoFinalCalculado = 0;
     }
 
     const notaStr = notasRes.length ? ` (${notasRes.join(", ")})` : "";
     const breakdownStr = breakdown.length ? breakdown.join(" + ") : "";
+
+    const danoFinalExibir = a._danoFinalCalculado ?? 0;
 
     html += `
       <div style="border-left:4px solid ${cor};padding:8px 10px;margin-bottom:6px;
@@ -335,24 +348,24 @@ async function criarMensagemGM(totalAtaque, dadosAlvos, danoBase, flavorDano, da
         ${temDano && breakdownStr ? `<div style="font-size:0.78em;color:#aaa;margin-top:4px">Dano por tipo: ${breakdownStr}</div>` : ""}
         ${a.acertou && temDano ? `
         <div style="font-size:0.85em;color:#ccc;margin-top:6px">
-          Dano calculado: <b>${danoFinal}</b>${notaStr}
+          Dano calculado: <b>${danoFinalExibir}</b>${notaStr}
         </div>
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="t20-aplicar"
             data-token="${a.tokenId}"
-            data-dano-final="${danoFinal}"
+            data-dano-final="${danoFinalExibir}"
             data-critico="${a.possivelCritico ? 1 : 0}"
             style="flex:1;padding:5px;border-radius:4px;cursor:pointer;
               background:#7a1a1a;border:1px solid #a02020;color:#fff;font-size:0.85em">
-            💔 Aplicar ${danoFinal} de Dano
+            💔 Aplicar ${danoFinalExibir} de Dano
           </button>
           <button class="t20-metade"
             data-token="${a.tokenId}"
-            data-dano-final="${Math.floor(danoFinal / 2)}"
+            data-dano-final="${Math.floor(danoFinalExibir / 2)}"
             data-critico="0"
             style="flex:1;padding:5px;border-radius:4px;cursor:pointer;
               background:#2c3e50;border:1px solid #3d5166;color:#fff;font-size:0.85em">
-            🛡️ Metade (${Math.floor(danoFinal / 2)})
+            🛡️ Metade (${Math.floor(danoFinalExibir / 2)})
           </button>
         </div>` : a.acertou ? `
         <div style="font-size:0.8em;color:#e67e22;margin-top:6px">
@@ -378,43 +391,4 @@ async function criarMensagemGM(totalAtaque, dadosAlvos, danoBase, flavorDano, da
       btn.addEventListener("click", () => aplicarDano(btn))
     );
   });
-}
-
-// Aplica o dano já calculado diretamente
-async function aplicarDano(btn) {
-  const tokenId = btn.dataset.token;
-  const dano = parseInt(btn.dataset.danoFinal) || 0;
-  const isCrit = btn.dataset.critico === "1";
-
-  const token = canvas.tokens.get(tokenId);
-  if (!token) return;
-
-  const danoFinal = isCrit ? dano * 2 : dano;
-
-  if (danoFinal <= 0) {
-    return ChatMessage.create({
-      content: `🛡️ <b>${token.name}</b> absorveu todo o dano.`
-    });
-  }
-
-  const hpPath = "system.attributes.pv.value";
-  const pvAtual = foundry.utils.getProperty(token.actor, hpPath);
-  if (pvAtual === undefined) return ui.notifications.warn("PV não encontrado!");
-
-  const pvMax = foundry.utils.getProperty(token.actor, "system.attributes.pv.max") ?? pvAtual;
-  const novoPV = Math.max(0, pvAtual - danoFinal);
-
-  await token.actor.update({ [hpPath]: novoPV });
-
-  const cor = novoPV === 0 ? "red" : novoPV <= pvMax / 2 ? "orange" : "green";
-
-  ChatMessage.create({
-    content: `💔 <b>${token.name}</b> sofreu <b>${danoFinal} de dano</b>${isCrit ? " (crítico)" : ""}.<br>
-      PV: ${pvAtual} → <span style="color:${cor}"><b>${novoPV}</b></span>
-      ${novoPV === 0 ? "<br>💀 <b>Incapacitado!</b>" : ""}`
-  });
-
-  // desabilita botões do bloco do alvo (evita aplicar 2x sem querer)
-  btn.closest("div")?.querySelectorAll("button")
-    ?.forEach(b => { b.disabled = true; b.style.opacity = "0.5"; });
 }

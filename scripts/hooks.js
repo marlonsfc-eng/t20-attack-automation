@@ -82,7 +82,7 @@ Hooks.on("createChatMessage", async (message, options, userId) => {
       foundry.utils.getProperty(actor, "system.attributes.pv.max") ?? "?";
 
     const tracos = actor.system?.tracos?.resistencias ?? {};
-    const rdGeral = tracos?.perda?.value ?? tracos?.dano?.value ?? 0;
+    const rdGeral = parseInt(tracos?.dano?.value) || parseInt(tracos?.dano?.base) || parseInt(tracos?.perda?.value) || parseInt(tracos?.perda?.base) || 0;
 
     const erroNatural = d20Result === 1;
     const possivelCritico = d20Result >= 20;

@@ -1,24 +1,29 @@
-// hooks.js - Tormenta20 Attack Automation v1.2
+// hooks.js - Tormenta20 Attack Automation v1.3
+// Ataque e dano vêm na mesma mensagem
 
 Hooks.once("ready", () => {
-  console.log("T20 Attack Automation | Módulo carregado!");
+  console.log("T20 Attack Automation | v1.3 carregado!");
   ui.notifications.info("⚔️ T20 Attack Automation ativo!");
 });
 
 Hooks.on("createChatMessage", async (message, options, userId) => {
   if (!message.rolls?.length) return;
+  if (userId !== game.userId) return;
 
+  // Detecta roll de ataque (d20)
   const rollAtaque = message.rolls.find(r => r.formula?.includes("d20"));
   if (!rollAtaque) return;
+
+  // Pega roll de dano da MESMA mensagem (sem d20)
+  const rollDano = message.rolls.find(r => !r.formula?.includes("d20"));
 
   const targets = Array.from(game.user.targets);
   if (!targets.length) return;
 
-  // Só processa quem fez o ataque
-  if (userId !== game.userId) return;
-
   const totalAtaque = rollAtaque.total;
   const d20Result = rollAtaque.dice?.[0]?.results?.[0]?.result;
+  const danoBase = rollDano ? rollDano.total : null;
+  const flavorDano = (message.flavor ?? "") + " " + (message.content ?? "");
 
   const dadosAlvos = targets.map(target => {
     const actor = target.actor;
@@ -60,19 +65,19 @@ Hooks.on("createChatMessage", async (message, options, userId) => {
     };
   });
 
-  // Mensagem pública para todos (sem dados sensíveis)
+  // Mensagem pública (todos veem, sem dados sensíveis)
   await criarMensagemPublica(totalAtaque, dadosAlvos);
 
-  // Mensagem do GM (com PV, Defesa e botões)
+  // Mensagem privada do GM
   if (game.user.isGM) {
-    await criarMensagemGM(totalAtaque, dadosAlvos, message.id);
+    await criarMensagemGM(totalAtaque, dadosAlvos, danoBase, flavorDano);
   } else {
-    // Jogador: pede ao GM via socket para criar a mensagem do GM
     game.socket.emit("module.t20-attack-automation", {
       tipo: "atacou",
-      messageId: message.id,
       totalAtaque,
-      dadosAlvos
+      dadosAlvos,
+      danoBase,
+      flavorDano
     });
   }
 });
@@ -81,9 +86,8 @@ Hooks.on("createChatMessage", async (message, options, userId) => {
 Hooks.once("ready", () => {
   game.socket.on("module.t20-attack-automation", async (data) => {
     if (!game.user.isGM) return;
-
     if (data.tipo === "atacou") {
-      await criarMensagemGM(data.totalAtaque, data.dadosAlvos, data.messageId);
+      await criarMensagemGM(data.totalAtaque, data.dadosAlvos, data.danoBase, data.flavorDano);
     }
   });
 });
@@ -118,7 +122,9 @@ async function criarMensagemPublica(totalAtaque, dadosAlvos) {
 }
 
 // Mensagem privada do GM (com botões de dano)
-async function criarMensagemGM(totalAtaque, dadosAlvos, attackMessageId) {
+async function criarMensagemGM(totalAtaque, dadosAlvos, danoBase, flavorDano) {
+  const temDano = danoBase !== null && danoBase !== undefined;
+
   let html = `
     <div style="
       background:linear-gradient(135deg,#0f0f1a,#1a1a2e);
@@ -127,6 +133,7 @@ async function criarMensagemGM(totalAtaque, dadosAlvos, attackMessageId) {
     ">
       <div style="border-bottom:1px solid #5a3a1a;padding-bottom:8px;margin-bottom:10px">
         <span style="color:#c9a227;font-weight:bold">🎲 Painel do GM — Ataque: ${totalAtaque}</span>
+        ${temDano ? `<span style="float:right;color:#e74c3c;font-weight:bold">Dano: ${danoBase}</span>` : ""}
       </div>`;
 
   for (const a of dadosAlvos) {
@@ -146,7 +153,7 @@ async function criarMensagemGM(totalAtaque, dadosAlvos, attackMessageId) {
           ${a.resistencias.length ? ` · Res: ${a.resistencias.join(", ")}` : ""}
           ${a.imunidades.length ? ` · Imune: ${a.imunidades.join(", ")}` : ""}
         </div>
-        ${a.acertou ? `
+        ${a.acertou && temDano ? `
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="t20-aplicar"
             data-token="${a.tokenId}"
@@ -154,21 +161,26 @@ async function criarMensagemGM(totalAtaque, dadosAlvos, attackMessageId) {
             data-resistencias='${JSON.stringify(a.resistencias)}'
             data-imunidades='${JSON.stringify(a.imunidades)}'
             data-critico="${a.possivelCritico ? 1 : 0}"
-            data-attack-msg="${attackMessageId}"
+            data-dano="${danoBase}"
+            data-flavor='${flavorDano.replace(/'/g, "").substring(0, 200)}'
             style="flex:1;padding:5px;border-radius:4px;cursor:pointer;
               background:#7a1a1a;border:1px solid #a02020;color:#fff;font-size:0.85em">
-            💔 Aplicar Dano
+            💔 Aplicar ${danoBase} de Dano
           </button>
           <button class="t20-metade"
             data-token="${a.tokenId}"
             data-rd="${a.rd}"
             data-resistencias='${JSON.stringify(a.resistencias)}'
             data-imunidades='${JSON.stringify(a.imunidades)}'
-            data-attack-msg="${attackMessageId}"
+            data-dano="${danoBase}"
+            data-flavor='${flavorDano.replace(/'/g, "").substring(0, 200)}'
             style="flex:1;padding:5px;border-radius:4px;cursor:pointer;
               background:#2c3e50;border:1px solid #3d5166;color:#fff;font-size:0.85em">
-            🛡️ Metade
+            🛡️ Metade (${Math.floor(danoBase / 2)})
           </button>
+        </div>` : a.acertou ? `
+        <div style="font-size:0.8em;color:#e67e22;margin-top:6px">
+          ⚠️ Nenhum roll de dano encontrado na mensagem.
         </div>` : ""}
       </div>`;
   }
@@ -194,34 +206,6 @@ async function criarMensagemGM(totalAtaque, dadosAlvos, attackMessageId) {
 
 // Clique no botão de dano
 async function clicarDano(btn, metade) {
-  const attackMsgId = btn.dataset.attackMsg;
-
-  // Busca mensagem de dano após a mensagem de ataque
-  const todasMsgs = game.messages.contents;
-  const idxAtaque = todasMsgs.findIndex(m => m.id === attackMsgId);
-
-  let msgDano = null;
-
-  if (idxAtaque >= 0) {
-    for (let i = idxAtaque + 1; i < todasMsgs.length; i++) {
-      const m = todasMsgs[i];
-      if (m.rolls?.length && !m.rolls.some(r => r.formula?.includes("d20"))) {
-        msgDano = m;
-        break;
-      }
-    }
-  }
-
-  // Fallback: última mensagem com dano no chat
-  if (!msgDano) {
-    msgDano = todasMsgs.slice().reverse()
-      .find(m => m.rolls?.length && !m.rolls.some(r => r.formula?.includes("d20")));
-  }
-
-  if (!msgDano) {
-    return ui.notifications.warn("⚠️ Role o dano primeiro, depois clique em Aplicar!");
-  }
-
   const dados = {
     tokenId:      btn.dataset.token,
     rd:           parseInt(btn.dataset.rd) || 0,
@@ -229,8 +213,8 @@ async function clicarDano(btn, metade) {
     imunidades:   JSON.parse(btn.dataset.imunidades   || "[]"),
     isCritico:    btn.dataset.critico === "1",
     metade,
-    danoBase: msgDano.rolls.reduce((t, r) => t + (r.total ?? 0), 0),
-    flavorDano: (msgDano.flavor ?? "") + " " + (msgDano.content ?? "")
+    danoBase:     parseInt(btn.dataset.dano) || 0,
+    flavorDano:   btn.dataset.flavor || ""
   };
 
   await processarDano(dados);

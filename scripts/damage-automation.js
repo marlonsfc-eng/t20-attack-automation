@@ -1,8 +1,3 @@
-// ============================================================
-// Tormenta20 Attack Automation - hooks.js
-// Registro central de todos os hooks do módulo
-// ============================================================
-
 import { T20AttackAutomation } from "./attack-automation.js";
 import { T20DamageAutomation } from "./damage-automation.js";
 import { T20ConditionAutomation } from "./condition-automation.js";

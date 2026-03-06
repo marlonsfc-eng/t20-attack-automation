@@ -516,15 +516,12 @@ async function rolarSalvamento(btn) {
 
   // Mensagem separada com resultado e dano aplicado
   const msgConteudo = `
-    <div style="
-      background:${sucesso ? "rgba(39,174,96,0.12)" : "rgba(231,76,60,0.12)"};
-      border-left:4px solid ${cor};border-radius:0 6px 6px 0;
-      padding:8px 12px;font-family:'Palatino Linotype',serif;color:#e8d5b7">
+    <div style="border-left:4px solid ${cor};padding:6px 10px;border-radius:0 4px 4px 0">
       <div style="font-weight:bold;font-size:1.05em;color:${cor};margin-bottom:4px">
         ${label} — ${actor.name}
       </div>
-      <div style="font-size:0.88em;color:#ccc">
-        ${notaDano.replace(/<br>/g, "<br>")}
+      <div style="font-size:0.88em">
+        ${notaDano}
       </div>
     </div>`;
 

@@ -1,303 +1,538 @@
-import { MODULE_ID, getSetting, emitSocket } from "./hooks.js";
+/* ============================================================
+   Arsenal T20 — Tema Dark Fantasy
+   Preto, Dourado, Vermelho
+   ============================================================ */
 
-export class T20DamageAutomation {
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap');
 
-  // ── Rola e aplica dano para um alvo ──────────────────────
-  static async rollAndApplyDamage(actor, item, targetActor, isCritical = false) {
-    const damageFormula = this._getDamageFormula(item, isCritical);
-    if (!damageFormula) return;
-
-    const roll = await new Roll(damageFormula, actor.getRollData()).evaluate();
-
-    const damageType = this._getDamageType(item);
-    const totalDamage = roll.total;
-
-    const mode = getSetting("autoDamageApplication");
-
-    if (mode === "none") {
-      // Apenas mostrar no chat
-      await this._createDamageCard(actor, item, roll, targetActor, isCritical, damageType);
-      return;
-    }
-
-    if (mode === "ask") {
-      const confirmed = await this._confirmDamageDialog(
-        totalDamage,
-        damageType,
-        targetActor,
-        isCritical
-      );
-      if (!confirmed) return;
-    }
-
-    // Aplicar o dano
-    await this._applyDamageToTarget(targetActor, totalDamage, damageType, item);
-    await this._createDamageCard(actor, item, roll, targetActor, isCritical, damageType, true);
-  }
-
-  // ── Diálogo de confirmação ────────────────────────────────
-  static async _confirmDamageDialog(damage, type, target, isCritical) {
-    return new Promise((resolve) => {
-      new Dialog({
-        title: "Aplicar Dano?",
-        content: `
-          <div class="t20-damage-confirm">
-            <p>${isCritical ? "⚔️ CRÍTICO! " : ""}Aplicar <strong>${damage} de dano${type ? ` (${type})` : ""}</strong> em <strong>${target.name}</strong>?</p>
-            <p>PV atual: <strong>${target.system?.hp?.value ?? target.system?.pv?.value ?? "?"}</strong></p>
-          </div>
-        `,
-        buttons: {
-          yes: {
-            icon: '<i class="fas fa-check"></i>',
-            label: "Aplicar",
-            callback: () => resolve(true),
-          },
-          no: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Cancelar",
-            callback: () => resolve(false),
-          },
-          half: {
-            icon: '<i class="fas fa-shield-alt"></i>',
-            label: "Metade (Resistência)",
-            callback: () => {
-              // Resolve com metade do dano sinalizado de forma diferente
-              resolve("half");
-            },
-          },
-        },
-        default: "yes",
-      }).render(true);
-    });
-  }
-
-  // ── Aplica dano diretamente no ator ──────────────────────
-  static async _applyDamageToTarget(targetActor, damage, damageType, item) {
-    // Suporte a diferentes estruturas de dados do T20
-    const hpPath = this._getHpPath(targetActor);
-    const currentHp = foundry.utils.getProperty(targetActor.system, hpPath + ".value");
-    const maxHp = foundry.utils.getProperty(targetActor.system, hpPath + ".max");
-
-    if (currentHp === undefined) {
-      ui.notifications.warn(`Não foi possível encontrar PV de ${targetActor.name}`);
-      return;
-    }
-
-    // Verificar redução de dano / resistências
-    const reducedDamage = await this._applyDamageReduction(targetActor, damage, damageType);
-    const finalDamage = Math.max(0, reducedDamage);
-
-    const newHp = Math.max(0, currentHp - finalDamage);
-
-    // Verificar se é GM ou tem permissão
-    if (targetActor.isOwner || game.user.isGM) {
-      await targetActor.update({
-        [`system.${hpPath}.value`]: newHp,
-      });
-    } else {
-      // Emitir para GM aplicar
-      emitSocket("applyDamage", {
-        actorId: targetActor.id,
-        tokenId: targetActor.token?.id,
-        damage: finalDamage,
-        hpPath,
-        newHp,
-      });
-    }
-
-    // Verificar condições por dano (sangramento, incapacitação)
-    await this._checkDamageConditions(targetActor, newHp, maxHp, finalDamage);
-
-    console.log(
-      `${MODULE_ID} | Dano aplicado: ${finalDamage} em ${targetActor.name} (${currentHp} → ${newHp})`
-    );
-  }
-
-  // ── Aplica redução de dano / resistências ─────────────────
-  static async _applyDamageReduction(actor, damage, damageType) {
-    // Verificar RD (Redução de Dano) do T20
-    const rd = actor.system?.attributes?.rd?.value ?? actor.system?.rd?.value ?? 0;
-
-    // Verificar imunidades
-    const immunities = actor.system?.traits?.di?.value ?? actor.system?.imunidades ?? [];
-    if (damageType && immunities.includes(damageType)) {
-      ui.notifications.info(`${actor.name} é imune a dano de ${damageType}!`);
-      return 0;
-    }
-
-    // Verificar resistências (metade do dano)
-    const resistances = actor.system?.traits?.dr?.value ?? actor.system?.resistencias ?? [];
-    if (damageType && resistances.includes(damageType)) {
-      ui.notifications.info(`${actor.name} é resistente a ${damageType} (metade do dano)!`);
-      return Math.floor(damage / 2);
-    }
-
-    // Aplicar RD
-    return Math.max(0, damage - rd);
-  }
-
-  // ── Verifica condições causadas por dano ──────────────────
-  static async _checkDamageConditions(actor, newHp, maxHp, damage) {
-    const { T20ConditionAutomation } = await import("./condition-automation.js");
-
-    // Incapacitado (0 PV)
-    if (newHp <= 0) {
-      await T20ConditionAutomation.applyCondition(actor, "unconscious");
-    }
-
-    // Criticamente ferido (menos de metade dos PV)
-    if (newHp <= maxHp / 2 && newHp > 0) {
-      // Verificar sangrando (regra opcional do T20)
-      const hasBleeding = actor.statuses?.has("bleeding") ?? false;
-      if (!hasBleeding && getSetting("enableConditionAutomation")) {
-        // Mostrar sugestão, não aplicar automaticamente
-        ChatMessage.create({
-          content: `<p class="t20-notice">⚠️ <strong>${actor.name}</strong> está com menos de metade dos PV. Considere aplicar a condição <em>Sangrando</em> se aplicável.</p>`,
-          whisper: [game.users.find((u) => u.isGM)?.id].filter(Boolean),
-        });
-      }
-    }
-  }
-
-  // ── Cria card de dano no chat ─────────────────────────────
-  static async _createDamageCard(actor, item, roll, target, isCritical, damageType, applied = false) {
-    const content = `
-      <div class="t20-damage-card ${isCritical ? "critical" : ""}">
-        <div class="t20-card-header">
-          <img src="${item.img}" class="t20-item-img" />
-          <div class="t20-card-title">
-            <span class="t20-item-name">${item.name}</span>
-            <span class="t20-card-subtitle">${isCritical ? "⚔️ Dano Crítico" : "Dano"}</span>
-          </div>
-        </div>
-        <div class="t20-damage-result">
-          <div class="t20-roll-formula">${roll.formula}</div>
-          <div class="t20-roll-total ${isCritical ? "critical" : ""}">${roll.total}</div>
-          ${damageType ? `<div class="t20-damage-type">${damageType}</div>` : ""}
-        </div>
-        ${target ? `
-        <div class="t20-target-info">
-          <span>Alvo: <strong>${target.name}</strong></span>
-          ${applied ? '<span class="t20-applied">✓ Dano aplicado</span>' : ""}
-        </div>
-        ` : ""}
-        <div class="t20-roll-breakdown">
-          ${roll.dice.map((d) => `
-            <div class="t20-die-results">
-              <span class="t20-die-label">d${d.faces}:</span>
-              ${d.results.map((r) => `
-                <span class="t20-die-result ${r.result === d.faces ? "max" : r.result === 1 ? "min" : ""}">${r.result}</span>
-              `).join("")}
-            </div>
-          `).join("")}
-        </div>
-        ${!applied && target ? `
-        <div class="t20-damage-buttons">
-          <button class="t20-apply-damage" data-actor-id="${target.id}" data-damage="${roll.total}">
-            <i class="fas fa-heart-broken"></i> Aplicar ${roll.total} de Dano
-          </button>
-          <button class="t20-apply-half-damage" data-actor-id="${target.id}" data-damage="${Math.floor(roll.total / 2)}">
-            <i class="fas fa-shield-alt"></i> Metade (${Math.floor(roll.total / 2)})
-          </button>
-        </div>
-        ` : ""}
-      </div>
-    `;
-
-    const msg = await ChatMessage.create({
-      user: game.userId,
-      speaker: ChatMessage.getSpeaker({ actor }),
-      content,
-      rolls: [roll],
-      flags: {
-        [MODULE_ID]: { type: "damageCard" },
-      },
-    });
-
-    return msg;
-  }
-
-  // ── Recebe dano via socket (para não-GMs) ─────────────────
-  static async applyDamageFromSocket(data) {
-    if (!game.user.isGM) return;
-
-    const actor =
-      game.actors.get(data.actorId) ??
-      canvas.tokens.get(data.tokenId)?.actor;
-
-    if (!actor) return;
-
-    await actor.update({
-      [`system.${this._getHpPath(actor)}.value`]: data.newHp,
-    });
-  }
-
-  // ── Helpers ───────────────────────────────────────────────
-  static _getDamageFormula(item, isCritical) {
-    const baseFormula =
-      item.system?.damage?.parts?.[0]?.[0] ??
-      item.system?.dano?.formula ??
-      item.system?.formula ??
-      null;
-
-    if (!baseFormula) return null;
-
-    if (isCritical) {
-      const multiplier = getSetting("criticalMultiplier");
-      // Dobra os dados: 1d8 → 2d8, etc.
-      return this._multiplyCriticalFormula(baseFormula, multiplier);
-    }
-
-    return baseFormula;
-  }
-
-  static _multiplyCriticalFormula(formula, multiplier) {
-    // Substitui XdY por (X*multiplier)dY
-    return formula.replace(/(\d+)d(\d+)/gi, (match, count, faces) => {
-      return `${parseInt(count) * multiplier}d${faces}`;
-    });
-  }
-
-  static _getDamageType(item) {
-    return (
-      item.system?.damage?.parts?.[0]?.[1] ??
-      item.system?.dano?.tipo ??
-      item.system?.damageType ??
-      null
-    );
-  }
-
-  static _getHpPath(actor) {
-    if (actor.system?.hp !== undefined) return "hp";
-    if (actor.system?.pv !== undefined) return "pv";
-    if (actor.system?.attributes?.hp !== undefined) return "attributes.hp";
-    return "hp";
-  }
+/* ── Variáveis ────────────────────────────────────────────── */
+:root {
+  --df-preto:       #0a0a0f;
+  --df-preto-meio:  #111118;
+  --df-preto-claro: #1a1a26;
+  --df-cinza:       #2a2a38;
+  --df-cinza-borda: #3a3a50;
+  --df-dourado:     #c9a227;
+  --df-dourado-brilho: #f0c040;
+  --df-dourado-escuro: #7a5a00;
+  --df-vermelho:    #8b1a1a;
+  --df-vermelho-brilho: #c0392b;
+  --df-texto:       #d4c5a0;
+  --df-texto-claro: #e8dcc0;
+  --df-texto-fraco: #7a6a50;
 }
 
-// ── Listener para botões de dano no chat ──────────────────
-Hooks.on("renderChatMessage", (message, html, data) => {
-  html.find(".t20-apply-damage").click(async (ev) => {
-    const actorId = ev.currentTarget.dataset.actorId;
-    const damage = parseInt(ev.currentTarget.dataset.damage);
-    const actor = game.actors.get(actorId);
-    if (!actor) return;
+/* ── Fonte global ─────────────────────────────────────────── */
+body, #interface, .app {
+  font-family: 'Crimson Text', 'Palatino Linotype', serif !important;
+}
+h1, h2, h3, h4, .window-title, .item-name, nav.tabs .item {
+  font-family: 'Cinzel', 'Palatino Linotype', serif !important;
+  letter-spacing: 0.04em;
+}
 
-    await T20DamageAutomation._applyDamageToTarget(actor, damage, null, null);
-    $(ev.currentTarget).closest(".t20-damage-buttons").html(
-      `<span class="t20-applied">✓ ${damage} de dano aplicado em ${actor.name}</span>`
-    );
-  });
+/* ── Background geral ─────────────────────────────────────── */
+body {
+  background: var(--df-preto) !important;
+}
+#board {
+  background: var(--df-preto) !important;
+}
 
-  html.find(".t20-apply-half-damage").click(async (ev) => {
-    const actorId = ev.currentTarget.dataset.actorId;
-    const damage = parseInt(ev.currentTarget.dataset.damage);
-    const actor = game.actors.get(actorId);
-    if (!actor) return;
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+#sidebar {
+  background: linear-gradient(180deg, var(--df-preto-meio) 0%, var(--df-preto) 100%) !important;
+  border-left: 2px solid var(--df-dourado-escuro) !important;
+  box-shadow: -4px 0 20px rgba(0,0,0,0.8) !important;
+}
 
-    await T20DamageAutomation._applyDamageToTarget(actor, damage, null, null);
-    $(ev.currentTarget).closest(".t20-damage-buttons").html(
-      `<span class="t20-applied">✓ ${damage} de dano (metade) aplicado em ${actor.name}</span>`
-    );
-  });
-});
+/* Abas da sidebar */
+#sidebar-tabs {
+  background: var(--df-preto) !important;
+  border-bottom: 1px solid var(--df-dourado-escuro) !important;
+}
+#sidebar-tabs .item {
+  color: var(--df-texto-fraco) !important;
+  border-bottom: 2px solid transparent !important;
+  transition: all 0.2s ease !important;
+}
+#sidebar-tabs .item:hover {
+  color: var(--df-dourado) !important;
+  text-shadow: 0 0 8px rgba(201,162,39,0.5) !important;
+}
+#sidebar-tabs .item.active {
+  color: var(--df-dourado) !important;
+  border-bottom-color: var(--df-dourado) !important;
+  text-shadow: 0 0 10px rgba(201,162,39,0.4) !important;
+}
+
+/* Listas de itens na sidebar */
+.directory-list .directory-item,
+.directory-list .document,
+.directory-list .folder {
+  color: var(--df-texto) !important;
+  border-bottom: 1px solid rgba(58,58,80,0.4) !important;
+  transition: background 0.15s ease !important;
+}
+.directory-list .directory-item:hover,
+.directory-list .document:hover {
+  background: rgba(201,162,39,0.08) !important;
+  color: var(--df-texto-claro) !important;
+}
+.directory-list .folder-header {
+  background: linear-gradient(90deg, rgba(139,26,26,0.3), transparent) !important;
+  color: var(--df-dourado) !important;
+  font-family: 'Cinzel', serif !important;
+  font-size: 0.85em !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+}
+
+/* Cabeçalho das seções da sidebar */
+#sidebar .directory-header,
+.sidebar-tab header.directory-header {
+  background: linear-gradient(90deg, var(--df-vermelho) 0%, var(--df-preto-meio) 100%) !important;
+  border-bottom: 1px solid var(--df-dourado-escuro) !important;
+  padding: 6px 10px !important;
+}
+#sidebar .directory-header h3,
+.sidebar-tab header h3 {
+  color: var(--df-dourado) !important;
+  font-family: 'Cinzel', serif !important;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8) !important;
+}
+
+/* Botões da sidebar */
+#sidebar .header-actions button,
+#sidebar button.create-document,
+#sidebar .create-folder {
+  background: var(--df-cinza) !important;
+  border: 1px solid var(--df-cinza-borda) !important;
+  color: var(--df-texto) !important;
+  border-radius: 3px !important;
+  transition: all 0.2s !important;
+}
+#sidebar .header-actions button:hover {
+  background: var(--df-vermelho) !important;
+  border-color: var(--df-vermelho-brilho) !important;
+  color: #fff !important;
+}
+
+/* Barra de busca */
+#sidebar input[type="search"],
+#sidebar input[type="text"] {
+  background: var(--df-preto-claro) !important;
+  border: 1px solid var(--df-cinza-borda) !important;
+  color: var(--df-texto) !important;
+  border-radius: 3px !important;
+}
+#sidebar input[type="search"]:focus,
+#sidebar input[type="text"]:focus {
+  border-color: var(--df-dourado-escuro) !important;
+  box-shadow: 0 0 6px rgba(201,162,39,0.2) !important;
+  outline: none !important;
+}
+
+/* ============================================================
+   CHAT
+   ============================================================ */
+#chat {
+  background: transparent !important;
+}
+#chat-log {
+  background: transparent !important;
+}
+
+/* Mensagens do chat */
+#chat-log .message {
+  background: linear-gradient(135deg, rgba(17,17,24,0.95), rgba(10,10,15,0.98)) !important;
+  border: 1px solid rgba(58,58,80,0.6) !important;
+  border-left: 3px solid var(--df-cinza-borda) !important;
+  border-radius: 0 4px 4px 0 !important;
+  color: var(--df-texto) !important;
+  margin: 4px 2px !important;
+  transition: border-left-color 0.2s !important;
+}
+#chat-log .message:hover {
+  border-left-color: var(--df-dourado-escuro) !important;
+}
+#chat-log .message.whisper {
+  border-left-color: var(--df-vermelho) !important;
+  background: linear-gradient(135deg, rgba(30,10,10,0.95), rgba(10,10,15,0.98)) !important;
+}
+
+/* Cabeçalho da mensagem */
+.message-header {
+  border-bottom: 1px solid rgba(58,58,80,0.5) !important;
+  padding-bottom: 4px !important;
+  margin-bottom: 6px !important;
+}
+.message-header .message-sender {
+  color: var(--df-dourado) !important;
+  font-family: 'Cinzel', serif !important;
+  font-size: 0.85em !important;
+  font-weight: 600 !important;
+}
+.message-header .message-metadata {
+  color: var(--df-texto-fraco) !important;
+  font-size: 0.75em !important;
+}
+
+/* Rolls no chat */
+.dice-roll .dice-result {
+  background: var(--df-preto-claro) !important;
+  border: 1px solid var(--df-cinza-borda) !important;
+  border-radius: 4px !important;
+}
+.dice-roll .dice-total {
+  color: var(--df-dourado-brilho) !important;
+  font-family: 'Cinzel', serif !important;
+  font-size: 1.6em !important;
+  text-shadow: 0 0 12px rgba(240,192,64,0.4) !important;
+}
+.dice-roll .dice-formula {
+  color: var(--df-texto-fraco) !important;
+  font-size: 0.85em !important;
+}
+.dice-roll .dice-tooltip {
+  background: var(--df-preto) !important;
+  border: 1px solid var(--df-cinza-borda) !important;
+  color: var(--df-texto) !important;
+}
+.dice-roll .dice-tooltip .part-total {
+  color: var(--df-dourado) !important;
+}
+
+/* Input do chat */
+#chat-form #chat-message {
+  background: var(--df-preto-claro) !important;
+  border: 1px solid var(--df-cinza-borda) !important;
+  color: var(--df-texto) !important;
+  border-radius: 4px !important;
+  font-family: 'Crimson Text', serif !important;
+  font-size: 1em !important;
+}
+#chat-form #chat-message:focus {
+  border-color: var(--df-dourado-escuro) !important;
+  box-shadow: 0 0 8px rgba(201,162,39,0.2) !important;
+  outline: none !important;
+}
+
+/* Controles do chat */
+#chat-controls {
+  background: var(--df-preto-meio) !important;
+  border-top: 1px solid var(--df-dourado-escuro) !important;
+}
+
+/* ============================================================
+   HOTBAR
+   ============================================================ */
+#hotbar {
+  background: linear-gradient(180deg, rgba(17,17,24,0.97) 0%, rgba(10,10,15,0.99) 100%) !important;
+  border-top: 2px solid var(--df-dourado-escuro) !important;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.8) !important;
+}
+#hotbar .bar-controls {
+  background: var(--df-preto) !important;
+}
+#hotbar .macro {
+  background: var(--df-preto-claro) !important;
+  border: 1px solid var(--df-cinza-borda) !important;
+  border-radius: 4px !important;
+  transition: all 0.2s ease !important;
+}
+#hotbar .macro:hover {
+  border-color: var(--df-dourado-escuro) !important;
+  box-shadow: 0 0 10px rgba(201,162,39,0.3), inset 0 0 10px rgba(201,162,39,0.05) !important;
+  transform: translateY(-2px) !important;
+}
+#hotbar .macro .macro-key {
+  background: var(--df-vermelho) !important;
+  color: #fff !important;
+  font-family: 'Cinzel', serif !important;
+  font-size: 0.7em !important;
+  border-radius: 2px !important;
+}
+#hotbar .macro .macro-name {
+  color: var(--df-texto-fraco) !important;
+  font-size: 0.65em !important;
+}
+
+/* Controles de navegação (zoom, etc.) */
+#controls {
+  background: linear-gradient(180deg, var(--df-preto-meio), var(--df-preto)) !important;
+  border-right: 2px solid var(--df-dourado-escuro) !important;
+  box-shadow: 4px 0 20px rgba(0,0,0,0.8) !important;
+}
+#controls .scene-control,
+#controls .control-tool {
+  color: var(--df-texto-fraco) !important;
+  border-radius: 4px !important;
+  transition: all 0.2s !important;
+}
+#controls .scene-control:hover,
+#controls .control-tool:hover {
+  color: var(--df-dourado) !important;
+  background: rgba(201,162,39,0.1) !important;
+  text-shadow: 0 0 8px rgba(201,162,39,0.5) !important;
+}
+#controls .scene-control.active,
+#controls .control-tool.active {
+  color: var(--df-dourado) !important;
+  background: rgba(139,26,26,0.4) !important;
+  border-left: 2px solid var(--df-vermelho-brilho) !important;
+}
+
+/* ============================================================
+   JANELAS / APPS
+   ============================================================ */
+.app.window-app {
+  background: linear-gradient(160deg, var(--df-preto-meio) 0%, var(--df-preto) 100%) !important;
+  border: 1px solid var(--df-cinza-borda) !important;
+  border-top: 2px solid var(--df-dourado-escuro) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.9), 0 0 0 1px rgba(201,162,39,0.1) !important;
+  color: var(--df-texto) !important;
+}
+
+/* Barra de título das janelas */
+.app .window-header {
+  background: linear-gradient(90deg, var(--df-vermelho) 0%, var(--df-preto-meio) 60%, var(--df-preto) 100%) !important;
+  border-bottom: 1px solid var(--df-dourado-escuro) !important;
+  border-radius: 4px 4px 0 0 !important;
+  padding: 6px 12px !important;
+}
+.app .window-header .window-title {
+  color: var(--df-dourado) !important;
+  font-family: 'Cinzel', serif !important;
+  font-size: 0.95em !important;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.9) !important;
+  letter-spacing: 0.05em !important;
+}
+.app .window-header a.header-button {
+  color: var(--df-texto-fraco) !important;
+  transition: color 0.2s !important;
+}
+.app .window-header a.header-button:hover {
+  color: var(--df-vermelho-brilho) !important;
+}
+
+/* Abas internas das janelas */
+.app nav.tabs {
+  background: var(--df-preto-claro) !important;
+  border-bottom: 1px solid var(--df-cinza-borda) !important;
+}
+.app nav.tabs .item {
+  color: var(--df-texto-fraco) !important;
+  font-family: 'Cinzel', serif !important;
+  font-size: 0.8em !important;
+  letter-spacing: 0.05em !important;
+  transition: all 0.2s !important;
+}
+.app nav.tabs .item:hover {
+  color: var(--df-dourado) !important;
+}
+.app nav.tabs .item.active {
+  color: var(--df-dourado) !important;
+  border-bottom: 2px solid var(--df-dourado) !important;
+  background: rgba(201,162,39,0.05) !important;
+}
+
+/* Conteúdo das janelas */
+.app .window-content {
+  background: transparent !important;
+  color: var(--df-texto) !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--df-dourado-escuro) var(--df-preto) !important;
+}
+
+/* Labels e campos de formulário */
+.app label, .form-group label {
+  color: var(--df-dourado) !important;
+  font-family: 'Cinzel', serif !important;
+  font-size: 0.8em !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+}
+.app input[type="text"],
+.app input[type="number"],
+.app input[type="password"],
+.app select,
+.app textarea {
+  background: var(--df-preto-claro) !important;
+  border: 1px solid var(--df-cinza-borda) !important;
+  color: var(--df-texto-claro) !important;
+  border-radius: 3px !important;
+  font-family: 'Crimson Text', serif !important;
+}
+.app input:focus,
+.app select:focus,
+.app textarea:focus {
+  border-color: var(--df-dourado-escuro) !important;
+  box-shadow: 0 0 6px rgba(201,162,39,0.25) !important;
+  outline: none !important;
+}
+
+/* Botões das janelas */
+.app button, .app .button {
+  background: linear-gradient(135deg, var(--df-cinza), var(--df-preto-claro)) !important;
+  border: 1px solid var(--df-cinza-borda) !important;
+  color: var(--df-texto) !important;
+  font-family: 'Cinzel', serif !important;
+  font-size: 0.8em !important;
+  letter-spacing: 0.04em !important;
+  border-radius: 3px !important;
+  transition: all 0.2s ease !important;
+}
+.app button:hover, .app .button:hover {
+  background: linear-gradient(135deg, var(--df-vermelho), var(--df-cinza)) !important;
+  border-color: var(--df-vermelho-brilho) !important;
+  color: #fff !important;
+  box-shadow: 0 0 10px rgba(139,26,26,0.4) !important;
+}
+
+/* Separadores e seções */
+.app .form-group:not(:last-child) {
+  border-bottom: 1px solid rgba(58,58,80,0.3) !important;
+  padding-bottom: 6px !important;
+  margin-bottom: 6px !important;
+}
+.app h2, .app h3 {
+  color: var(--df-dourado) !important;
+  border-bottom: 1px solid var(--df-dourado-escuro) !important;
+  padding-bottom: 4px !important;
+  font-family: 'Cinzel', serif !important;
+}
+
+/* ============================================================
+   FICHA DE PERSONAGEM T20
+   ============================================================ */
+.tormenta20.sheet .window-content {
+  background: linear-gradient(160deg, #0f0f18 0%, #08080f 100%) !important;
+}
+.tormenta20.sheet .sheet-header {
+  background: linear-gradient(90deg, var(--df-vermelho) 0%, rgba(139,26,26,0.3) 50%, transparent 100%) !important;
+  border-bottom: 2px solid var(--df-dourado-escuro) !important;
+  padding: 10px !important;
+}
+.tormenta20.sheet .sheet-header .charname input {
+  color: var(--df-dourado-brilho) !important;
+  font-family: 'Cinzel', serif !important;
+  font-size: 1.4em !important;
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid var(--df-dourado-escuro) !important;
+  text-shadow: 0 0 15px rgba(240,192,64,0.3) !important;
+}
+.tormenta20.sheet .attribute-value input,
+.tormenta20.sheet .resource-value {
+  color: var(--df-dourado) !important;
+  font-family: 'Cinzel', serif !important;
+}
+.tormenta20.sheet .item-list .item {
+  border-bottom: 1px solid rgba(58,58,80,0.3) !important;
+  color: var(--df-texto) !important;
+  transition: background 0.15s !important;
+}
+.tormenta20.sheet .item-list .item:hover {
+  background: rgba(201,162,39,0.06) !important;
+}
+
+/* ============================================================
+   SCROLLBARS
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+}
+::-webkit-scrollbar-track {
+  background: var(--df-preto) !important;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--df-dourado-escuro) !important;
+  border-radius: 3px !important;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--df-dourado) !important;
+}
+
+/* ============================================================
+   TOOLTIPS
+   ============================================================ */
+#tooltip {
+  background: var(--df-preto-meio) !important;
+  border: 1px solid var(--df-dourado-escuro) !important;
+  color: var(--df-texto) !important;
+  font-family: 'Crimson Text', serif !important;
+  border-radius: 4px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.8) !important;
+}
+
+/* ============================================================
+   NOTIFICATIONS
+   ============================================================ */
+#notifications .notification {
+  background: var(--df-preto-meio) !important;
+  border-left: 3px solid var(--df-cinza-borda) !important;
+  color: var(--df-texto) !important;
+  font-family: 'Crimson Text', serif !important;
+}
+#notifications .notification.info {
+  border-left-color: var(--df-dourado) !important;
+}
+#notifications .notification.warning {
+  border-left-color: #e67e22 !important;
+}
+#notifications .notification.error {
+  border-left-color: var(--df-vermelho-brilho) !important;
+}
+
+/* ============================================================
+   COMBAT TRACKER
+   ============================================================ */
+#combat .combatant {
+  background: var(--df-preto-claro) !important;
+  border: 1px solid rgba(58,58,80,0.4) !important;
+  border-radius: 3px !important;
+  color: var(--df-texto) !important;
+  transition: all 0.15s !important;
+}
+#combat .combatant:hover {
+  background: rgba(201,162,39,0.08) !important;
+  border-color: var(--df-dourado-escuro) !important;
+}
+#combat .combatant.active {
+  background: linear-gradient(90deg, rgba(139,26,26,0.4), rgba(26,26,38,0.8)) !important;
+  border-left: 3px solid var(--df-vermelho-brilho) !important;
+  box-shadow: 0 0 12px rgba(139,26,26,0.3) !important;
+}
+#combat .combatant .token-name {
+  color: var(--df-texto-claro) !important;
+  font-family: 'Cinzel', serif !important;
+  font-size: 0.85em !important;
+}
+#combat .combatant.active .token-name {
+  color: var(--df-dourado) !important;
+  text-shadow: 0 0 8px rgba(201,162,39,0.3) !important;
+}
+#combat-tracker .combat-control {
+  color: var(--df-texto-fraco) !important;
+  transition: color 0.2s !important;
+}
+#combat-tracker .combat-control:hover {
+  color: var(--df-dourado) !important;
+}
+
+/* ============================================================
+   PAUSE SCREEN
+   ============================================================ */
+#pause figcaption {
+  color: var(--df-dourado) !important;
+  font-family: 'Cinzel', serif !important;
+  font-size: 1.5em !important;
+  text-shadow: 0 0 20px rgba(201,162,39,0.6), 0 2px 4px rgba(0,0,0,0.9) !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+}

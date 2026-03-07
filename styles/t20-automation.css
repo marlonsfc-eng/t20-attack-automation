@@ -1,538 +1,454 @@
 /* ============================================================
-   Arsenal T20 — Tema Dark Fantasy
-   Preto, Dourado, Vermelho
+   Arsenal T20 — Sistema de Temas
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=IM+Fell+English:ital@0;1&display=swap');
 
-/* ── Variáveis ────────────────────────────────────────────── */
-:root {
-  --df-preto:       #0a0a0f;
-  --df-preto-meio:  #111118;
-  --df-preto-claro: #1a1a26;
-  --df-cinza:       #2a2a38;
-  --df-cinza-borda: #3a3a50;
-  --df-dourado:     #c9a227;
-  --df-dourado-brilho: #f0c040;
-  --df-dourado-escuro: #7a5a00;
-  --df-vermelho:    #8b1a1a;
-  --df-vermelho-brilho: #c0392b;
-  --df-texto:       #d4c5a0;
-  --df-texto-claro: #e8dcc0;
-  --df-texto-fraco: #7a6a50;
+/* ============================================================
+   TEMA: ARCANO
+   Roxo escuro, azul profundo, brilhos mágicos
+   ============================================================ */
+body.arsenal-tema-arcano {
+  --t-bg:          #07070f;
+  --t-bg-meio:     #0d0d1a;
+  --t-bg-claro:    #141428;
+  --t-cinza:       #1e1e38;
+  --t-borda:       #2e2e52;
+  --t-primario:    #7b5ea7;
+  --t-primario-brilho: #a07fd4;
+  --t-primario-escuro: #3d2d6a;
+  --t-acento:      #3a7bd5;
+  --t-acento-brilho: #5a9bf5;
+  --t-texto:       #c8bde8;
+  --t-texto-claro: #e0d8f8;
+  --t-texto-fraco: #5a527a;
+  --t-fonte-titulo: 'Cinzel', serif;
+  --t-fonte-corpo:  'Crimson Text', serif;
 }
 
-/* ── Fonte global ─────────────────────────────────────────── */
-body, #interface, .app {
-  font-family: 'Crimson Text', 'Palatino Linotype', serif !important;
+/* ============================================================
+   TEMA: NEUTRO ELEGANTE
+   Cinza escuro, prata, minimalista
+   ============================================================ */
+body.arsenal-tema-neutro {
+  --t-bg:          #0e0e10;
+  --t-bg-meio:     #141416;
+  --t-bg-claro:    #1c1c20;
+  --t-cinza:       #252528;
+  --t-borda:       #333338;
+  --t-primario:    #9a9aaa;
+  --t-primario-brilho: #c8c8d8;
+  --t-primario-escuro: #4a4a58;
+  --t-acento:      #c0392b;
+  --t-acento-brilho: #e74c3c;
+  --t-texto:       #c4c4cc;
+  --t-texto-claro: #e0e0e8;
+  --t-texto-fraco: #5a5a64;
+  --t-fonte-titulo: 'Cinzel', serif;
+  --t-fonte-corpo:  'Crimson Text', serif;
 }
-h1, h2, h3, h4, .window-title, .item-name, nav.tabs .item {
-  font-family: 'Cinzel', 'Palatino Linotype', serif !important;
+
+/* ============================================================
+   TEMA: PERGAMINHO
+   Bege envelhecido, marrom, sépia, detalhes vermelho
+   ============================================================ */
+body.arsenal-tema-pergaminho {
+  --t-bg:          #1a1208;
+  --t-bg-meio:     #221808;
+  --t-bg-claro:    #2e2010;
+  --t-cinza:       #3a2c18;
+  --t-borda:       #5a4028;
+  --t-primario:    #c8932a;
+  --t-primario-brilho: #e8b84a;
+  --t-primario-escuro: #7a5010;
+  --t-acento:      #8b1a1a;
+  --t-acento-brilho: #c0392b;
+  --t-texto:       #d4b896;
+  --t-texto-claro: #e8d0b0;
+  --t-texto-fraco: #7a5a3a;
+  --t-fonte-titulo: 'IM Fell English', serif;
+  --t-fonte-corpo:  'Crimson Text', serif;
+}
+
+/* ============================================================
+   ESTILOS APLICADOS — todos os temas usam as variáveis --t-*
+   ============================================================ */
+body.arsenal-tema-arcano,
+body.arsenal-tema-neutro,
+body.arsenal-tema-pergaminho {
+  font-family: var(--t-fonte-corpo) !important;
+  background: var(--t-bg) !important;
+}
+
+/* Títulos globais */
+body.arsenal-tema-arcano h1, body.arsenal-tema-arcano h2, body.arsenal-tema-arcano h3,
+body.arsenal-tema-arcano h4, body.arsenal-tema-arcano .window-title,
+body.arsenal-tema-neutro h1, body.arsenal-tema-neutro h2, body.arsenal-tema-neutro h3,
+body.arsenal-tema-neutro h4, body.arsenal-tema-neutro .window-title,
+body.arsenal-tema-pergaminho h1, body.arsenal-tema-pergaminho h2, body.arsenal-tema-pergaminho h3,
+body.arsenal-tema-pergaminho h4, body.arsenal-tema-pergaminho .window-title {
+  font-family: var(--t-fonte-titulo) !important;
   letter-spacing: 0.04em;
 }
 
-/* ── Background geral ─────────────────────────────────────── */
-body {
-  background: var(--df-preto) !important;
-}
-#board {
-  background: var(--df-preto) !important;
-}
+/* Seletor de conveniência */
+.arsenal-t [class*="arsenal-tema-"] { /* placeholder */ }
 
-/* ============================================================
-   SIDEBAR
-   ============================================================ */
-#sidebar {
-  background: linear-gradient(180deg, var(--df-preto-meio) 0%, var(--df-preto) 100%) !important;
-  border-left: 2px solid var(--df-dourado-escuro) !important;
-  box-shadow: -4px 0 20px rgba(0,0,0,0.8) !important;
+/* ── SIDEBAR ─────────────────────────────────────────────── */
+body[class*="arsenal-tema"] #sidebar {
+  background: linear-gradient(180deg, var(--t-bg-meio) 0%, var(--t-bg) 100%) !important;
+  border-left: 2px solid var(--t-primario-escuro) !important;
+  box-shadow: -4px 0 20px rgba(0,0,0,0.7) !important;
 }
-
-/* Abas da sidebar */
-#sidebar-tabs {
-  background: var(--df-preto) !important;
-  border-bottom: 1px solid var(--df-dourado-escuro) !important;
+body[class*="arsenal-tema"] #sidebar-tabs {
+  background: var(--t-bg) !important;
+  border-bottom: 1px solid var(--t-primario-escuro) !important;
 }
-#sidebar-tabs .item {
-  color: var(--df-texto-fraco) !important;
+body[class*="arsenal-tema"] #sidebar-tabs .item {
+  color: var(--t-texto-fraco) !important;
   border-bottom: 2px solid transparent !important;
-  transition: all 0.2s ease !important;
+  transition: all 0.2s !important;
 }
-#sidebar-tabs .item:hover {
-  color: var(--df-dourado) !important;
-  text-shadow: 0 0 8px rgba(201,162,39,0.5) !important;
+body[class*="arsenal-tema"] #sidebar-tabs .item:hover {
+  color: var(--t-primario-brilho) !important;
 }
-#sidebar-tabs .item.active {
-  color: var(--df-dourado) !important;
-  border-bottom-color: var(--df-dourado) !important;
-  text-shadow: 0 0 10px rgba(201,162,39,0.4) !important;
+body[class*="arsenal-tema"] #sidebar-tabs .item.active {
+  color: var(--t-primario-brilho) !important;
+  border-bottom-color: var(--t-primario) !important;
 }
-
-/* Listas de itens na sidebar */
-.directory-list .directory-item,
-.directory-list .document,
-.directory-list .folder {
-  color: var(--df-texto) !important;
-  border-bottom: 1px solid rgba(58,58,80,0.4) !important;
-  transition: background 0.15s ease !important;
+body[class*="arsenal-tema"] .directory-list .directory-item,
+body[class*="arsenal-tema"] .directory-list .document {
+  color: var(--t-texto) !important;
+  border-bottom: 1px solid rgba(90,90,90,0.2) !important;
+  transition: background 0.15s !important;
 }
-.directory-list .directory-item:hover,
-.directory-list .document:hover {
-  background: rgba(201,162,39,0.08) !important;
-  color: var(--df-texto-claro) !important;
+body[class*="arsenal-tema"] .directory-list .directory-item:hover,
+body[class*="arsenal-tema"] .directory-list .document:hover {
+  background: rgba(255,255,255,0.04) !important;
+  color: var(--t-texto-claro) !important;
 }
-.directory-list .folder-header {
-  background: linear-gradient(90deg, rgba(139,26,26,0.3), transparent) !important;
-  color: var(--df-dourado) !important;
-  font-family: 'Cinzel', serif !important;
-  font-size: 0.85em !important;
+body[class*="arsenal-tema"] .directory-list .folder-header {
+  background: linear-gradient(90deg, rgba(0,0,0,0.3), transparent) !important;
+  color: var(--t-primario) !important;
+  font-family: var(--t-fonte-titulo) !important;
+  font-size: 0.8em !important;
   letter-spacing: 0.06em !important;
   text-transform: uppercase !important;
+  border-left: 3px solid var(--t-acento) !important;
 }
-
-/* Cabeçalho das seções da sidebar */
-#sidebar .directory-header,
-.sidebar-tab header.directory-header {
-  background: linear-gradient(90deg, var(--df-vermelho) 0%, var(--df-preto-meio) 100%) !important;
-  border-bottom: 1px solid var(--df-dourado-escuro) !important;
-  padding: 6px 10px !important;
+body[class*="arsenal-tema"] #sidebar .directory-header {
+  background: linear-gradient(90deg, var(--t-acento) 0%, var(--t-bg-meio) 100%) !important;
+  border-bottom: 1px solid var(--t-primario-escuro) !important;
 }
-#sidebar .directory-header h3,
-.sidebar-tab header h3 {
-  color: var(--df-dourado) !important;
-  font-family: 'Cinzel', serif !important;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.8) !important;
+body[class*="arsenal-tema"] #sidebar .directory-header h3 {
+  color: var(--t-primario-brilho) !important;
+  font-family: var(--t-fonte-titulo) !important;
 }
-
-/* Botões da sidebar */
-#sidebar .header-actions button,
-#sidebar button.create-document,
-#sidebar .create-folder {
-  background: var(--df-cinza) !important;
-  border: 1px solid var(--df-cinza-borda) !important;
-  color: var(--df-texto) !important;
-  border-radius: 3px !important;
-  transition: all 0.2s !important;
-}
-#sidebar .header-actions button:hover {
-  background: var(--df-vermelho) !important;
-  border-color: var(--df-vermelho-brilho) !important;
-  color: #fff !important;
-}
-
-/* Barra de busca */
-#sidebar input[type="search"],
-#sidebar input[type="text"] {
-  background: var(--df-preto-claro) !important;
-  border: 1px solid var(--df-cinza-borda) !important;
-  color: var(--df-texto) !important;
+body[class*="arsenal-tema"] #sidebar input[type="search"],
+body[class*="arsenal-tema"] #sidebar input[type="text"] {
+  background: var(--t-bg-claro) !important;
+  border: 1px solid var(--t-borda) !important;
+  color: var(--t-texto) !important;
   border-radius: 3px !important;
 }
-#sidebar input[type="search"]:focus,
-#sidebar input[type="text"]:focus {
-  border-color: var(--df-dourado-escuro) !important;
-  box-shadow: 0 0 6px rgba(201,162,39,0.2) !important;
+body[class*="arsenal-tema"] #sidebar input:focus {
+  border-color: var(--t-primario-escuro) !important;
   outline: none !important;
 }
 
-/* ============================================================
-   CHAT
-   ============================================================ */
-#chat {
-  background: transparent !important;
-}
-#chat-log {
-  background: transparent !important;
-}
-
-/* Mensagens do chat */
-#chat-log .message {
-  background: linear-gradient(135deg, rgba(17,17,24,0.95), rgba(10,10,15,0.98)) !important;
-  border: 1px solid rgba(58,58,80,0.6) !important;
-  border-left: 3px solid var(--df-cinza-borda) !important;
+/* ── CHAT ────────────────────────────────────────────────── */
+body[class*="arsenal-tema"] #chat-log .message {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--t-bg-meio) 95%, transparent), var(--t-bg)) !important;
+  border: 1px solid rgba(90,90,90,0.3) !important;
+  border-left: 3px solid var(--t-borda) !important;
   border-radius: 0 4px 4px 0 !important;
-  color: var(--df-texto) !important;
-  margin: 4px 2px !important;
+  color: var(--t-texto) !important;
+  margin: 3px 2px !important;
   transition: border-left-color 0.2s !important;
 }
-#chat-log .message:hover {
-  border-left-color: var(--df-dourado-escuro) !important;
+body[class*="arsenal-tema"] #chat-log .message:hover {
+  border-left-color: var(--t-primario-escuro) !important;
 }
-#chat-log .message.whisper {
-  border-left-color: var(--df-vermelho) !important;
-  background: linear-gradient(135deg, rgba(30,10,10,0.95), rgba(10,10,15,0.98)) !important;
+body[class*="arsenal-tema"] #chat-log .message.whisper {
+  border-left-color: var(--t-acento) !important;
 }
-
-/* Cabeçalho da mensagem */
-.message-header {
-  border-bottom: 1px solid rgba(58,58,80,0.5) !important;
-  padding-bottom: 4px !important;
-  margin-bottom: 6px !important;
-}
-.message-header .message-sender {
-  color: var(--df-dourado) !important;
-  font-family: 'Cinzel', serif !important;
+body[class*="arsenal-tema"] .message-header .message-sender {
+  color: var(--t-primario-brilho) !important;
+  font-family: var(--t-fonte-titulo) !important;
   font-size: 0.85em !important;
-  font-weight: 600 !important;
 }
-.message-header .message-metadata {
-  color: var(--df-texto-fraco) !important;
-  font-size: 0.75em !important;
+body[class*="arsenal-tema"] .message-header .message-metadata {
+  color: var(--t-texto-fraco) !important;
 }
-
-/* Rolls no chat */
-.dice-roll .dice-result {
-  background: var(--df-preto-claro) !important;
-  border: 1px solid var(--df-cinza-borda) !important;
-  border-radius: 4px !important;
-}
-.dice-roll .dice-total {
-  color: var(--df-dourado-brilho) !important;
-  font-family: 'Cinzel', serif !important;
+body[class*="arsenal-tema"] .dice-roll .dice-total {
+  color: var(--t-primario-brilho) !important;
+  font-family: var(--t-fonte-titulo) !important;
   font-size: 1.6em !important;
-  text-shadow: 0 0 12px rgba(240,192,64,0.4) !important;
+  text-shadow: 0 0 12px color-mix(in srgb, var(--t-primario) 60%, transparent) !important;
 }
-.dice-roll .dice-formula {
-  color: var(--df-texto-fraco) !important;
-  font-size: 0.85em !important;
+body[class*="arsenal-tema"] .dice-roll .dice-formula {
+  color: var(--t-texto-fraco) !important;
 }
-.dice-roll .dice-tooltip {
-  background: var(--df-preto) !important;
-  border: 1px solid var(--df-cinza-borda) !important;
-  color: var(--df-texto) !important;
+body[class*="arsenal-tema"] .dice-roll .dice-tooltip {
+  background: var(--t-bg) !important;
+  border: 1px solid var(--t-borda) !important;
+  color: var(--t-texto) !important;
 }
-.dice-roll .dice-tooltip .part-total {
-  color: var(--df-dourado) !important;
-}
-
-/* Input do chat */
-#chat-form #chat-message {
-  background: var(--df-preto-claro) !important;
-  border: 1px solid var(--df-cinza-borda) !important;
-  color: var(--df-texto) !important;
+body[class*="arsenal-tema"] #chat-form #chat-message {
+  background: var(--t-bg-claro) !important;
+  border: 1px solid var(--t-borda) !important;
+  color: var(--t-texto) !important;
   border-radius: 4px !important;
-  font-family: 'Crimson Text', serif !important;
-  font-size: 1em !important;
+  font-family: var(--t-fonte-corpo) !important;
 }
-#chat-form #chat-message:focus {
-  border-color: var(--df-dourado-escuro) !important;
-  box-shadow: 0 0 8px rgba(201,162,39,0.2) !important;
+body[class*="arsenal-tema"] #chat-form #chat-message:focus {
+  border-color: var(--t-primario-escuro) !important;
   outline: none !important;
 }
-
-/* Controles do chat */
-#chat-controls {
-  background: var(--df-preto-meio) !important;
-  border-top: 1px solid var(--df-dourado-escuro) !important;
+body[class*="arsenal-tema"] #chat-controls {
+  background: var(--t-bg-meio) !important;
+  border-top: 1px solid var(--t-primario-escuro) !important;
 }
 
-/* ============================================================
-   HOTBAR
-   ============================================================ */
-#hotbar {
-  background: linear-gradient(180deg, rgba(17,17,24,0.97) 0%, rgba(10,10,15,0.99) 100%) !important;
-  border-top: 2px solid var(--df-dourado-escuro) !important;
-  box-shadow: 0 -4px 20px rgba(0,0,0,0.8) !important;
+/* ── HOTBAR ──────────────────────────────────────────────── */
+body[class*="arsenal-tema"] #hotbar {
+  background: linear-gradient(180deg, var(--t-bg-meio) 0%, var(--t-bg) 100%) !important;
+  border-top: 2px solid var(--t-primario-escuro) !important;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.7) !important;
 }
-#hotbar .bar-controls {
-  background: var(--df-preto) !important;
-}
-#hotbar .macro {
-  background: var(--df-preto-claro) !important;
-  border: 1px solid var(--df-cinza-borda) !important;
+body[class*="arsenal-tema"] #hotbar .macro {
+  background: var(--t-bg-claro) !important;
+  border: 1px solid var(--t-borda) !important;
   border-radius: 4px !important;
   transition: all 0.2s ease !important;
 }
-#hotbar .macro:hover {
-  border-color: var(--df-dourado-escuro) !important;
-  box-shadow: 0 0 10px rgba(201,162,39,0.3), inset 0 0 10px rgba(201,162,39,0.05) !important;
+body[class*="arsenal-tema"] #hotbar .macro:hover {
+  border-color: var(--t-primario) !important;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--t-primario) 40%, transparent) !important;
   transform: translateY(-2px) !important;
 }
-#hotbar .macro .macro-key {
-  background: var(--df-vermelho) !important;
+body[class*="arsenal-tema"] #hotbar .macro .macro-key {
+  background: var(--t-acento) !important;
   color: #fff !important;
-  font-family: 'Cinzel', serif !important;
-  font-size: 0.7em !important;
-  border-radius: 2px !important;
+  font-family: var(--t-fonte-titulo) !important;
 }
-#hotbar .macro .macro-name {
-  color: var(--df-texto-fraco) !important;
-  font-size: 0.65em !important;
+body[class*="arsenal-tema"] #hotbar .macro .macro-name {
+  color: var(--t-texto-fraco) !important;
 }
 
-/* Controles de navegação (zoom, etc.) */
-#controls {
-  background: linear-gradient(180deg, var(--df-preto-meio), var(--df-preto)) !important;
-  border-right: 2px solid var(--df-dourado-escuro) !important;
-  box-shadow: 4px 0 20px rgba(0,0,0,0.8) !important;
+/* ── CONTROLES ───────────────────────────────────────────── */
+body[class*="arsenal-tema"] #controls {
+  background: linear-gradient(180deg, var(--t-bg-meio), var(--t-bg)) !important;
+  border-right: 2px solid var(--t-primario-escuro) !important;
 }
-#controls .scene-control,
-#controls .control-tool {
-  color: var(--df-texto-fraco) !important;
-  border-radius: 4px !important;
+body[class*="arsenal-tema"] #controls .scene-control,
+body[class*="arsenal-tema"] #controls .control-tool {
+  color: var(--t-texto-fraco) !important;
   transition: all 0.2s !important;
 }
-#controls .scene-control:hover,
-#controls .control-tool:hover {
-  color: var(--df-dourado) !important;
-  background: rgba(201,162,39,0.1) !important;
-  text-shadow: 0 0 8px rgba(201,162,39,0.5) !important;
+body[class*="arsenal-tema"] #controls .scene-control:hover,
+body[class*="arsenal-tema"] #controls .control-tool:hover {
+  color: var(--t-primario-brilho) !important;
+  background: rgba(255,255,255,0.05) !important;
 }
-#controls .scene-control.active,
-#controls .control-tool.active {
-  color: var(--df-dourado) !important;
-  background: rgba(139,26,26,0.4) !important;
-  border-left: 2px solid var(--df-vermelho-brilho) !important;
+body[class*="arsenal-tema"] #controls .scene-control.active,
+body[class*="arsenal-tema"] #controls .control-tool.active {
+  color: var(--t-primario-brilho) !important;
+  background: color-mix(in srgb, var(--t-acento) 25%, transparent) !important;
+  border-left: 2px solid var(--t-acento) !important;
 }
 
-/* ============================================================
-   JANELAS / APPS
-   ============================================================ */
-.app.window-app {
-  background: linear-gradient(160deg, var(--df-preto-meio) 0%, var(--df-preto) 100%) !important;
-  border: 1px solid var(--df-cinza-borda) !important;
-  border-top: 2px solid var(--df-dourado-escuro) !important;
+/* ── JANELAS ─────────────────────────────────────────────── */
+body[class*="arsenal-tema"] .app.window-app {
+  background: linear-gradient(160deg, var(--t-bg-meio) 0%, var(--t-bg) 100%) !important;
+  border: 1px solid var(--t-borda) !important;
+  border-top: 2px solid var(--t-primario-escuro) !important;
   border-radius: 6px !important;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.9), 0 0 0 1px rgba(201,162,39,0.1) !important;
-  color: var(--df-texto) !important;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.9) !important;
+  color: var(--t-texto) !important;
 }
-
-/* Barra de título das janelas */
-.app .window-header {
-  background: linear-gradient(90deg, var(--df-vermelho) 0%, var(--df-preto-meio) 60%, var(--df-preto) 100%) !important;
-  border-bottom: 1px solid var(--df-dourado-escuro) !important;
+body[class*="arsenal-tema"] .app .window-header {
+  background: linear-gradient(90deg, var(--t-acento) 0%, var(--t-bg-meio) 60%, var(--t-bg) 100%) !important;
+  border-bottom: 1px solid var(--t-primario-escuro) !important;
   border-radius: 4px 4px 0 0 !important;
   padding: 6px 12px !important;
 }
-.app .window-header .window-title {
-  color: var(--df-dourado) !important;
-  font-family: 'Cinzel', serif !important;
+body[class*="arsenal-tema"] .app .window-header .window-title {
+  color: var(--t-primario-brilho) !important;
+  font-family: var(--t-fonte-titulo) !important;
   font-size: 0.95em !important;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.9) !important;
   letter-spacing: 0.05em !important;
 }
-.app .window-header a.header-button {
-  color: var(--df-texto-fraco) !important;
+body[class*="arsenal-tema"] .app .window-header a.header-button {
+  color: var(--t-texto-fraco) !important;
   transition: color 0.2s !important;
 }
-.app .window-header a.header-button:hover {
-  color: var(--df-vermelho-brilho) !important;
+body[class*="arsenal-tema"] .app .window-header a.header-button:hover {
+  color: var(--t-acento-brilho) !important;
 }
-
-/* Abas internas das janelas */
-.app nav.tabs {
-  background: var(--df-preto-claro) !important;
-  border-bottom: 1px solid var(--df-cinza-borda) !important;
+body[class*="arsenal-tema"] .app nav.tabs {
+  background: var(--t-bg-claro) !important;
+  border-bottom: 1px solid var(--t-borda) !important;
 }
-.app nav.tabs .item {
-  color: var(--df-texto-fraco) !important;
-  font-family: 'Cinzel', serif !important;
+body[class*="arsenal-tema"] .app nav.tabs .item {
+  color: var(--t-texto-fraco) !important;
+  font-family: var(--t-fonte-titulo) !important;
   font-size: 0.8em !important;
-  letter-spacing: 0.05em !important;
   transition: all 0.2s !important;
 }
-.app nav.tabs .item:hover {
-  color: var(--df-dourado) !important;
+body[class*="arsenal-tema"] .app nav.tabs .item:hover { color: var(--t-primario-brilho) !important; }
+body[class*="arsenal-tema"] .app nav.tabs .item.active {
+  color: var(--t-primario-brilho) !important;
+  border-bottom: 2px solid var(--t-primario) !important;
 }
-.app nav.tabs .item.active {
-  color: var(--df-dourado) !important;
-  border-bottom: 2px solid var(--df-dourado) !important;
-  background: rgba(201,162,39,0.05) !important;
-}
-
-/* Conteúdo das janelas */
-.app .window-content {
+body[class*="arsenal-tema"] .app .window-content {
   background: transparent !important;
-  color: var(--df-texto) !important;
+  color: var(--t-texto) !important;
   scrollbar-width: thin !important;
-  scrollbar-color: var(--df-dourado-escuro) var(--df-preto) !important;
+  scrollbar-color: var(--t-primario-escuro) var(--t-bg) !important;
 }
-
-/* Labels e campos de formulário */
-.app label, .form-group label {
-  color: var(--df-dourado) !important;
-  font-family: 'Cinzel', serif !important;
+body[class*="arsenal-tema"] .app label,
+body[class*="arsenal-tema"] .form-group label {
+  color: var(--t-primario) !important;
+  font-family: var(--t-fonte-titulo) !important;
   font-size: 0.8em !important;
-  letter-spacing: 0.04em !important;
   text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
 }
-.app input[type="text"],
-.app input[type="number"],
-.app input[type="password"],
-.app select,
-.app textarea {
-  background: var(--df-preto-claro) !important;
-  border: 1px solid var(--df-cinza-borda) !important;
-  color: var(--df-texto-claro) !important;
+body[class*="arsenal-tema"] .app input[type="text"],
+body[class*="arsenal-tema"] .app input[type="number"],
+body[class*="arsenal-tema"] .app select,
+body[class*="arsenal-tema"] .app textarea {
+  background: var(--t-bg-claro) !important;
+  border: 1px solid var(--t-borda) !important;
+  color: var(--t-texto-claro) !important;
   border-radius: 3px !important;
-  font-family: 'Crimson Text', serif !important;
+  font-family: var(--t-fonte-corpo) !important;
 }
-.app input:focus,
-.app select:focus,
-.app textarea:focus {
-  border-color: var(--df-dourado-escuro) !important;
-  box-shadow: 0 0 6px rgba(201,162,39,0.25) !important;
+body[class*="arsenal-tema"] .app input:focus,
+body[class*="arsenal-tema"] .app select:focus,
+body[class*="arsenal-tema"] .app textarea:focus {
+  border-color: var(--t-primario-escuro) !important;
   outline: none !important;
 }
-
-/* Botões das janelas */
-.app button, .app .button {
-  background: linear-gradient(135deg, var(--df-cinza), var(--df-preto-claro)) !important;
-  border: 1px solid var(--df-cinza-borda) !important;
-  color: var(--df-texto) !important;
-  font-family: 'Cinzel', serif !important;
+body[class*="arsenal-tema"] .app button {
+  background: linear-gradient(135deg, var(--t-cinza), var(--t-bg-claro)) !important;
+  border: 1px solid var(--t-borda) !important;
+  color: var(--t-texto) !important;
+  font-family: var(--t-fonte-titulo) !important;
   font-size: 0.8em !important;
-  letter-spacing: 0.04em !important;
   border-radius: 3px !important;
-  transition: all 0.2s ease !important;
+  transition: all 0.2s !important;
 }
-.app button:hover, .app .button:hover {
-  background: linear-gradient(135deg, var(--df-vermelho), var(--df-cinza)) !important;
-  border-color: var(--df-vermelho-brilho) !important;
+body[class*="arsenal-tema"] .app button:hover {
+  background: linear-gradient(135deg, var(--t-acento), var(--t-cinza)) !important;
+  border-color: var(--t-acento-brilho) !important;
   color: #fff !important;
-  box-shadow: 0 0 10px rgba(139,26,26,0.4) !important;
 }
-
-/* Separadores e seções */
-.app .form-group:not(:last-child) {
-  border-bottom: 1px solid rgba(58,58,80,0.3) !important;
-  padding-bottom: 6px !important;
-  margin-bottom: 6px !important;
-}
-.app h2, .app h3 {
-  color: var(--df-dourado) !important;
-  border-bottom: 1px solid var(--df-dourado-escuro) !important;
+body[class*="arsenal-tema"] .app h2,
+body[class*="arsenal-tema"] .app h3 {
+  color: var(--t-primario) !important;
+  border-bottom: 1px solid var(--t-primario-escuro) !important;
   padding-bottom: 4px !important;
-  font-family: 'Cinzel', serif !important;
+  font-family: var(--t-fonte-titulo) !important;
 }
 
-/* ============================================================
-   FICHA DE PERSONAGEM T20
-   ============================================================ */
-.tormenta20.sheet .window-content {
-  background: linear-gradient(160deg, #0f0f18 0%, #08080f 100%) !important;
+/* ── FICHA T20 ───────────────────────────────────────────── */
+body[class*="arsenal-tema"] .tormenta20.sheet .window-content {
+  background: linear-gradient(160deg, var(--t-bg-meio) 0%, var(--t-bg) 100%) !important;
 }
-.tormenta20.sheet .sheet-header {
-  background: linear-gradient(90deg, var(--df-vermelho) 0%, rgba(139,26,26,0.3) 50%, transparent 100%) !important;
-  border-bottom: 2px solid var(--df-dourado-escuro) !important;
-  padding: 10px !important;
+body[class*="arsenal-tema"] .tormenta20.sheet .sheet-header {
+  background: linear-gradient(90deg, var(--t-acento) 0%, rgba(0,0,0,0.2) 60%, transparent 100%) !important;
+  border-bottom: 2px solid var(--t-primario-escuro) !important;
 }
-.tormenta20.sheet .sheet-header .charname input {
-  color: var(--df-dourado-brilho) !important;
-  font-family: 'Cinzel', serif !important;
+body[class*="arsenal-tema"] .tormenta20.sheet .charname input {
+  color: var(--t-primario-brilho) !important;
+  font-family: var(--t-fonte-titulo) !important;
   font-size: 1.4em !important;
   background: transparent !important;
   border: none !important;
-  border-bottom: 1px solid var(--df-dourado-escuro) !important;
-  text-shadow: 0 0 15px rgba(240,192,64,0.3) !important;
+  border-bottom: 1px solid var(--t-primario-escuro) !important;
 }
-.tormenta20.sheet .attribute-value input,
-.tormenta20.sheet .resource-value {
-  color: var(--df-dourado) !important;
-  font-family: 'Cinzel', serif !important;
-}
-.tormenta20.sheet .item-list .item {
-  border-bottom: 1px solid rgba(58,58,80,0.3) !important;
-  color: var(--df-texto) !important;
+body[class*="arsenal-tema"] .tormenta20.sheet .item-list .item {
+  border-bottom: 1px solid rgba(90,90,90,0.2) !important;
+  color: var(--t-texto) !important;
   transition: background 0.15s !important;
 }
-.tormenta20.sheet .item-list .item:hover {
-  background: rgba(201,162,39,0.06) !important;
+body[class*="arsenal-tema"] .tormenta20.sheet .item-list .item:hover {
+  background: rgba(255,255,255,0.04) !important;
 }
 
-/* ============================================================
-   SCROLLBARS
-   ============================================================ */
-::-webkit-scrollbar {
-  width: 6px !important;
-  height: 6px !important;
-}
-::-webkit-scrollbar-track {
-  background: var(--df-preto) !important;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--df-dourado-escuro) !important;
-  border-radius: 3px !important;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--df-dourado) !important;
-}
-
-/* ============================================================
-   TOOLTIPS
-   ============================================================ */
-#tooltip {
-  background: var(--df-preto-meio) !important;
-  border: 1px solid var(--df-dourado-escuro) !important;
-  color: var(--df-texto) !important;
-  font-family: 'Crimson Text', serif !important;
-  border-radius: 4px !important;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.8) !important;
-}
-
-/* ============================================================
-   NOTIFICATIONS
-   ============================================================ */
-#notifications .notification {
-  background: var(--df-preto-meio) !important;
-  border-left: 3px solid var(--df-cinza-borda) !important;
-  color: var(--df-texto) !important;
-  font-family: 'Crimson Text', serif !important;
-}
-#notifications .notification.info {
-  border-left-color: var(--df-dourado) !important;
-}
-#notifications .notification.warning {
-  border-left-color: #e67e22 !important;
-}
-#notifications .notification.error {
-  border-left-color: var(--df-vermelho-brilho) !important;
-}
-
-/* ============================================================
-   COMBAT TRACKER
-   ============================================================ */
-#combat .combatant {
-  background: var(--df-preto-claro) !important;
-  border: 1px solid rgba(58,58,80,0.4) !important;
-  border-radius: 3px !important;
-  color: var(--df-texto) !important;
+/* ── COMBAT TRACKER ──────────────────────────────────────── */
+body[class*="arsenal-tema"] #combat .combatant {
+  background: var(--t-bg-claro) !important;
+  border: 1px solid rgba(90,90,90,0.3) !important;
+  color: var(--t-texto) !important;
   transition: all 0.15s !important;
 }
-#combat .combatant:hover {
-  background: rgba(201,162,39,0.08) !important;
-  border-color: var(--df-dourado-escuro) !important;
+body[class*="arsenal-tema"] #combat .combatant:hover {
+  background: rgba(255,255,255,0.03) !important;
+  border-color: var(--t-primario-escuro) !important;
 }
-#combat .combatant.active {
-  background: linear-gradient(90deg, rgba(139,26,26,0.4), rgba(26,26,38,0.8)) !important;
-  border-left: 3px solid var(--df-vermelho-brilho) !important;
-  box-shadow: 0 0 12px rgba(139,26,26,0.3) !important;
+body[class*="arsenal-tema"] #combat .combatant.active {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--t-acento) 35%, transparent), var(--t-bg-claro)) !important;
+  border-left: 3px solid var(--t-acento-brilho) !important;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--t-acento) 30%, transparent) !important;
 }
-#combat .combatant .token-name {
-  color: var(--df-texto-claro) !important;
-  font-family: 'Cinzel', serif !important;
-  font-size: 0.85em !important;
-}
-#combat .combatant.active .token-name {
-  color: var(--df-dourado) !important;
-  text-shadow: 0 0 8px rgba(201,162,39,0.3) !important;
-}
-#combat-tracker .combat-control {
-  color: var(--df-texto-fraco) !important;
-  transition: color 0.2s !important;
-}
-#combat-tracker .combat-control:hover {
-  color: var(--df-dourado) !important;
+body[class*="arsenal-tema"] #combat .combatant.active .token-name {
+  color: var(--t-primario-brilho) !important;
 }
 
-/* ============================================================
-   PAUSE SCREEN
-   ============================================================ */
-#pause figcaption {
-  color: var(--df-dourado) !important;
-  font-family: 'Cinzel', serif !important;
+/* ── SCROLLBARS ──────────────────────────────────────────── */
+body[class*="arsenal-tema"] ::-webkit-scrollbar { width: 6px !important; }
+body[class*="arsenal-tema"] ::-webkit-scrollbar-track { background: var(--t-bg) !important; }
+body[class*="arsenal-tema"] ::-webkit-scrollbar-thumb { background: var(--t-primario-escuro) !important; border-radius: 3px !important; }
+body[class*="arsenal-tema"] ::-webkit-scrollbar-thumb:hover { background: var(--t-primario) !important; }
+
+/* ── NOTIFICATIONS ───────────────────────────────────────── */
+body[class*="arsenal-tema"] #notifications .notification {
+  background: var(--t-bg-meio) !important;
+  border-left: 3px solid var(--t-borda) !important;
+  color: var(--t-texto) !important;
+}
+body[class*="arsenal-tema"] #notifications .notification.info { border-left-color: var(--t-primario) !important; }
+body[class*="arsenal-tema"] #notifications .notification.error { border-left-color: var(--t-acento-brilho) !important; }
+
+/* ── PAUSE ───────────────────────────────────────────────── */
+body[class*="arsenal-tema"] #pause figcaption {
+  color: var(--t-primario-brilho) !important;
+  font-family: var(--t-fonte-titulo) !important;
   font-size: 1.5em !important;
-  text-shadow: 0 0 20px rgba(201,162,39,0.6), 0 2px 4px rgba(0,0,0,0.9) !important;
+  text-shadow: 0 0 20px color-mix(in srgb, var(--t-primario) 60%, transparent), 0 2px 4px rgba(0,0,0,0.9) !important;
   letter-spacing: 0.1em !important;
   text-transform: uppercase !important;
+}
+
+/* ── TOOLTIP ─────────────────────────────────────────────── */
+body[class*="arsenal-tema"] #tooltip {
+  background: var(--t-bg-meio) !important;
+  border: 1px solid var(--t-primario-escuro) !important;
+  color: var(--t-texto) !important;
+  font-family: var(--t-fonte-corpo) !important;
+  border-radius: 4px !important;
+}
+
+/* ── PERGAMINHO: textura especial ────────────────────────── */
+body.arsenal-tema-pergaminho #sidebar,
+body.arsenal-tema-pergaminho .app.window-app {
+  background-image:
+    linear-gradient(160deg, var(--t-bg-meio) 0%, var(--t-bg) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E") !important;
+}
+
+/* ── ARCANO: glow especial nos dados ─────────────────────── */
+body.arsenal-tema-arcano .dice-roll .dice-total {
+  text-shadow:
+    0 0 10px #a07fd4,
+    0 0 20px rgba(123,94,167,0.4),
+    0 0 40px rgba(123,94,167,0.2) !important;
+}
+body.arsenal-tema-arcano #hotbar .macro:hover {
+  box-shadow:
+    0 0 10px rgba(123,94,167,0.4),
+    0 0 20px rgba(58,123,213,0.2) !important;
 }

@@ -117,6 +117,10 @@ Hooks.once("ready", () => {
     if (data.tipo === "atacou") {
       await criarMensagemGM(data.totalAtaque, data.dadosAlvos, data.danoPorTipo, data.danoTotal);
     }
+    if (data.tipo === "aplicarCondicoes") {
+      const actor = game.actors.get(data.actorId);
+      if (actor) await aplicarCondicoes(actor, data.condicoes, data.nomeItem);
+    }
   });
 });
 
@@ -373,6 +377,10 @@ Hooks.on("createChatMessage", async (message, options, userId) => {
   const rollDanoMagia = message.rolls?.find(r => !r.formula?.includes("d20"));
   const danoRolado = rollDanoMagia?.total ?? null;
 
+  // Detectar condições mencionadas na descrição do item
+  const descricaoTexto = itemData?.description?.value?.replace(/<[^>]+>/g, " ") ?? "";
+  const condicoes = detectarCondicoes(descricaoTexto + " " + (resistencia.txt ?? ""));
+
   await criarCartaoSalvamento({
     nomeItem,
     imgItem,
@@ -385,11 +393,12 @@ Hooks.on("createChatMessage", async (message, options, userId) => {
     tipoDano,
     formulaDano,
     danoRolado,
+    condicoes,
   });
 });
 
 async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
-    salvLabel, salvPericia, salvAtributo, cd, efeitoSucesso, tipoDano, formulaDano, danoRolado }) {
+    salvLabel, salvPericia, salvAtributo, cd, efeitoSucesso, tipoDano, formulaDano, danoRolado, condicoes = [] }) {
 
   const html = `
     <div style="
@@ -412,6 +421,7 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
         🎲 Teste de <b style="color:#e8d5b7">${salvLabel}</b> CD ${cd}
         ${efeitoSucesso ? `<br>✅ Sucesso: ${efeitoSucesso}` : ""}
         ${formulaDano   ? `<br>💥 Dano: ${formulaDano}${tipoDano ? ` [${tipoDano}]` : ""}` : ""}
+        ${condicoes.length ? `<br>🔮 Falha aplica: <b>${condicoes.map(id => CONFIG.statusEffects.find(e=>e.id===id)?.name ?? id).join(", ")}</b>` : ""}
       </div>
       <div style="display:flex;gap:4px;margin-top:6px">
         <button class="t20-salvar"
@@ -421,6 +431,7 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
           data-item="${nomeItem}"
           data-dano="${danoRolado ?? 0}"
           data-tipo-dano="${tipoDano}"
+          data-condicoes="${condicoes.join(',')}"
           data-poder="0"
           title="Sucesso: ÷2 | Falha: total"
           style="flex:1;padding:5px 3px;border-radius:4px;cursor:pointer;font-size:0.78em;
@@ -435,6 +446,7 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
           data-item="${nomeItem}"
           data-dano="${danoRolado ?? 0}"
           data-tipo-dano="${tipoDano}"
+          data-condicoes="${condicoes.join(',')}"
           data-poder="1"
           title="Sucesso: ÷4 | Falha: ÷2"
           style="flex:1;padding:5px 3px;border-radius:4px;cursor:pointer;font-size:0.78em;
@@ -449,6 +461,7 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
           data-item="${nomeItem}"
           data-dano="${danoRolado ?? 0}"
           data-tipo-dano="${tipoDano}"
+          data-condicoes="${condicoes.join(',')}"
           title="Escolher atributo e bônus manualmente"
           style="flex:1;padding:5px 3px;border-radius:4px;cursor:pointer;font-size:0.78em;
             background:linear-gradient(135deg,#3a2a1a,#5a3a1a);
@@ -470,6 +483,7 @@ async function rolarSalvamento(btn) {
   const danoBase    = parseInt(btn.dataset.dano) || 0;
   const tipoDano    = (btn.dataset.tipoDano ?? "").toLowerCase();
   const temPoder    = btn.dataset.poder === "1";
+  const condicoes   = (btn.dataset.condicoes ?? "").split(",").filter(Boolean);
 
   const actor = canvas.tokens.controlled[0]?.actor ?? game.user.character;
   if (!actor) return ui.notifications.warn("Selecione seu token antes de rolar!");
@@ -562,6 +576,20 @@ async function rolarSalvamento(btn) {
     speaker: ChatMessage.getSpeaker({ actor }),
   });
 
+  // Aplicar condições em caso de falha
+  if (!sucesso && condicoes.length) {
+    if (game.user.isGM) {
+      await aplicarCondicoes(actor, condicoes, nomeItem);
+    } else {
+      game.socket.emit("module.t20-attack-automation", {
+        tipo: "aplicarCondicoes",
+        actorId: actor.id,
+        condicoes,
+        nomeItem,
+      });
+    }
+  }
+
   // NÃO desabilita o botão — outros jogadores podem precisar rolar também
 }
 
@@ -582,8 +610,9 @@ Hooks.on("renderChatMessage", (message, html) => {
 async function abrirDialogCustom(btn) {
   const cd       = parseInt(btn.dataset.cd);
   const nomeItem = btn.dataset.item;
-  const danoBase = parseInt(btn.dataset.dano) || 0;
-  const tipoDano = (btn.dataset.tipoDano ?? "").toLowerCase();
+  const danoBase  = parseInt(btn.dataset.dano) || 0;
+  const tipoDano  = (btn.dataset.tipoDano ?? "").toLowerCase();
+  const condicoes = (btn.dataset.condicoes ?? "").split(",").filter(Boolean);
 
   const actor = canvas.tokens.controlled[0]?.actor ?? game.user.character;
   if (!actor) return ui.notifications.warn("Selecione seu token antes de rolar!");
@@ -636,6 +665,7 @@ async function abrirDialogCustom(btn) {
             salvLabel: labels[pericia],
             bonusExtra: bonus,
             temPoder,
+            condicoes,
           });
         }
       },
@@ -646,7 +676,7 @@ async function abrirDialogCustom(btn) {
 }
 
 async function rolarSalvamentoCustom({ actor, cd, nomeItem, danoBase, tipoDano,
-    salvPericia, salvLabel, bonusExtra, temPoder }) {
+    salvPericia, salvLabel, bonusExtra, temPoder, condicoes = [] }) {
 
   const pericias = actor.system?.pericias ?? {};
   const bonus    = (pericias[salvPericia]?.value ?? 0) + bonusExtra;
@@ -720,5 +750,100 @@ async function rolarSalvamentoCustom({ actor, cd, nomeItem, danoBase, tipoDano,
       <div style="font-size:0.88em">${notaDano}</div>
     </div>`,
     speaker: ChatMessage.getSpeaker({ actor }),
+  });
+
+  if (!sucesso && condicoes.length) {
+    if (game.user.isGM) {
+      await aplicarCondicoes(actor, condicoes, nomeItem);
+    } else {
+      game.socket.emit("module.t20-attack-automation", {
+        tipo: "aplicarCondicoes",
+        actorId: actor.id,
+        condicoes,
+        nomeItem,
+      });
+    }
+  }
+}
+
+// ============================================================
+// CONDIÇÕES AUTOMÁTICAS
+// ============================================================
+
+// Mapa de texto → ID da condição do T20
+const CONDICOES_MAP = {
+  "em chamas":     "emchamas",
+  "chamas":        "emchamas",
+  "abalado":       "abalado",
+  "agarrado":      "agarrado",
+  "alquebrado":    "alquebrado",
+  "apavorado":     "apavorado",
+  "atordoado":     "atordoado",
+  "caído":         "caido",
+  "caido":         "caido",
+  "cego":          "cego",
+  "confuso":       "confuso",
+  "debilitado":    "debilitado",
+  "desprevenido":  "desprevenido",
+  "doente":        "doente",
+  "enfeitiçado":   "enfeiticado",
+  "enfeiticado":   "enfeiticado",
+  "enjoado":       "enjoado",
+  "enredado":      "enredado",
+  "envenenado":    "envenenado",
+  "esmorecido":    "esmorecido",
+  "exausto":       "exausto",
+  "fascinado":     "fascinado",
+  "fatigado":      "fatigado",
+  "fraco":         "fraco",
+  "frustrado":     "frustrado",
+  "imóvel":        "imovel",
+  "imovel":        "imovel",
+  "inconsciente":  "inconsciente",
+  "indefeso":      "indefeso",
+  "invisível":     "invisivel",
+  "invisivel":     "invisivel",
+  "lento":         "lento",
+  "morto":         "morto",
+  "ofuscado":      "ofuscado",
+  "paralisado":    "paralisado",
+  "pasmo":         "pasmo",
+  "petrificado":   "petrificado",
+  "sangrando":     "sangrando",
+  "surdo":         "surdo",
+  "surpreendido":  "surpreendido",
+  "vulnerável":    "vulneravel",
+  "vulneravel":    "vulneravel",
+  "sobrecarregado":"sobrecarregado",
+};
+
+// Detecta condições mencionadas no texto de um item
+function detectarCondicoes(texto) {
+  const lower = texto.toLowerCase();
+  const encontradas = new Set();
+  for (const [chave, id] of Object.entries(CONDICOES_MAP)) {
+    if (lower.includes(chave)) encontradas.add(id);
+  }
+  return [...encontradas];
+}
+
+// Aplica condições em um ator (requer permissão de GM ou owner)
+async function aplicarCondicoes(actor, condicoes, nomeItem) {
+  if (!condicoes.length) return;
+  for (const id of condicoes) {
+    const jaAtiva = actor.statuses?.has(id);
+    if (!jaAtiva) {
+      await actor.toggleStatusEffect(id);
+    }
+  }
+  const nomes = condicoes.map(id =>
+    CONFIG.statusEffects.find(e => e.id === id)?.name ?? id
+  ).join(", ");
+
+  ChatMessage.create({
+    content: `<div style="border-left:4px solid #9b59b6;padding:6px 10px;border-radius:0 4px 4px 0">
+      <b>🔮 ${actor.name}</b> recebeu a condição: <b>${nomes}</b>
+      <div style="font-size:0.85em;color:#888">por: ${nomeItem}</div>
+    </div>`
   });
 }

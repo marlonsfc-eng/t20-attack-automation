@@ -379,7 +379,7 @@ Hooks.on("createChatMessage", async (message, options, userId) => {
 
   // Detectar condições via IA
   const descricaoTexto = itemData?.description?.value ?? "";
-  const condicoesIA = await detectarCondicoesIA(nomeItem, descricaoTexto, resistencia.txt ?? "");
+  const condicoesIA = detectarCondicoesContexto(nomeItem, descricaoTexto, resistencia.txt ?? "");
   const condicoesAoFalhar = condicoesIA.aoFalhar ?? [];
   const condicoesAoPassar = condicoesIA.aoPassar ?? [];
 
@@ -830,53 +830,63 @@ const CONDICOES_MAP = {
   "sobrecarregado":"sobrecarregado",
 };
 
-// Usa Claude para interpretar condições do texto da magia
-async function detectarCondicoesIA(nomeItem, descricao, txtResistencia) {
-  const idsDisponiveis = Object.values(CONDICOES_MAP).filter((v,i,a) => a.indexOf(v)===i);
-  const nomesDisponiveis = idsDisponiveis.map(id =>
-    CONFIG.statusEffects.find(e => e.id === id)?.name ?? id
-  );
+// Detecta condições com contexto — distingue "aplica X" de "não fica X" ou "como X"
+function detectarCondicoesContexto(nomeItem, descricao, txtResistencia) {
+  const texto = descricao.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").toLowerCase();
 
-  const prompt = `Você é um assistente de RPG analisando uma magia/poder do sistema Tormenta20.
+  const aoFalhar = new Set();
+  const aoPassar = new Set();
 
-Nome: ${nomeItem}
-Descrição: ${descricao.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()}
-Texto de resistência: ${txtResistencia}
+  // Padrões de negação — se a condição aparece aqui, IGNORAR
+  const negacoes = [
+    /não.{0,20}(fica|ficará|aplica|causa|recebe)/,
+    /sem.{0,10}(ficar|aplicar)/,
+    /evita.{0,20}/,
+    /impede.{0,20}/,
+    /como se.{0,30}/,        // "como se estivesse X" = referência
+    /não.{0,5}irá/,
+    /não acumul/,
+    /deixá-lo/,              // "não irá deixá-lo exausto"
+  ];
 
-Condições disponíveis no sistema (use EXATAMENTE estes IDs):
-${idsDisponiveis.map((id,i) => `${id} = ${nomesDisponiveis[i]}`).join(", ")}
+  // Detectar blocos de texto separados por "se falhar" / "se passar"
+  // Padrões: "se falhar... fica X", "falhar na resistência... X", "se passar... Y"
+  const blocoFalha  = texto.match(/(?:se falhar|falhar na resist[eê]ncia|ao falhar|em caso de falha)[^.]*\.?([^.]{0,300})/i)?.[1] ?? "";
+  const blocoSucesso = texto.match(/(?:se passar|passar na resist[eê]ncia|ao passar|em caso de sucesso|se resistir)[^.]*\.?([^.]{0,300})/i)?.[1] ?? "";
 
-Analise o texto e retorne um JSON com esta estrutura exata:
-{
-  "aoFalhar": ["id1", "id2"],
-  "aoPassar": ["id1"],
-  "observacao": "texto opcional explicando a lógica"
-}
+  // Se não achou blocos separados, tudo vai para aoFalhar (comportamento padrão)
+  const textoPrincipal = blocoFalha || texto;
 
-Regras:
-- Liste APENAS condições que são APLICADAS como efeito direto, não as mencionadas como referência ou exemplo
-- Se uma condição só aparece como referência negativa (ex: "não ficará exausto"), NÃO inclua
-- Se uma condição se aplica em ambos os casos (falha e sucesso), coloque nos dois
-- Retorne SOMENTE o JSON, sem mais nada`;
+  for (const [chave, id] of Object.entries(CONDICOES_MAP)) {
+    // Verificar negações — se a condição aparece num contexto negativo, pular
+    const regexCondicao = new RegExp(`.{0,40}${chave}.{0,40}`, "gi");
+    const ocorrencias = [...texto.matchAll(regexCondicao)].map(m => m[0]);
+    const eNegada = ocorrencias.some(trecho =>
+      negacoes.some(neg => neg.test(trecho))
+    );
+    if (eNegada) continue;
 
-  try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 300,
-        messages: [{ role: "user", content: prompt }]
-      })
-    });
-    const data = await response.json();
-    const texto = data.content?.[0]?.text ?? "{}";
-    const clean = texto.replace(/```json|```/g, "").trim();
-    return JSON.parse(clean);
-  } catch (e) {
-    console.warn("T20 Automation | Erro ao detectar condições via IA:", e);
-    return { aoFalhar: [], aoPassar: [] };
+    // Verificar no bloco de falha
+    if (blocoFalha && blocoFalha.includes(chave)) {
+      aoFalhar.add(id);
+    }
+    // Verificar no bloco de sucesso
+    if (blocoSucesso && blocoSucesso.includes(chave)) {
+      aoPassar.add(id);
+    }
+    // Se não há blocos separados mas a condição está no texto geral
+    if (!blocoFalha && !blocoSucesso && texto.includes(chave)) {
+      aoFalhar.add(id);
+    }
   }
+
+  // Também verificar no txt de resistência (ex: "Reflexos reduz à metade e evita a condição")
+  // Se diz "evita a condição", sucesso não aplica nada (já é o padrão)
+
+  return {
+    aoFalhar: [...aoFalhar],
+    aoPassar: [...aoPassar],
+  };
 }
 
 // Aplica condições em um ator (requer permissão de GM ou owner)

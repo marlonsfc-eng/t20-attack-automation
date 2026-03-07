@@ -413,7 +413,7 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
         ${efeitoSucesso ? `<br>✅ Sucesso: ${efeitoSucesso}` : ""}
         ${formulaDano   ? `<br>💥 Dano: ${formulaDano}${tipoDano ? ` [${tipoDano}]` : ""}` : ""}
       </div>
-      <div style="display:flex;gap:6px;margin-top:4px">
+      <div style="display:flex;gap:4px;margin-top:6px">
         <button class="t20-salvar"
           data-salv-pericia="${salvPericia}"
           data-salv-label="${salvLabel}"
@@ -422,10 +422,11 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
           data-dano="${danoRolado ?? 0}"
           data-tipo-dano="${tipoDano}"
           data-poder="0"
-          style="flex:1;padding:8px;border-radius:5px;cursor:pointer;font-size:0.88em;
+          title="Sucesso: ÷2 | Falha: total"
+          style="flex:1;padding:5px 3px;border-radius:4px;cursor:pointer;font-size:0.78em;
             background:linear-gradient(135deg,#1a4a1a,#2a6a2a);
             border:1px solid #3a8a3a;color:#fff;font-weight:bold">
-          🎲 Rolar ${salvLabel}${danoRolado ? ` (${danoRolado} / ${Math.floor(danoRolado/2)})` : ""}
+          🎲 ${salvLabel}
         </button>
         <button class="t20-salvar"
           data-salv-pericia="${salvPericia}"
@@ -435,11 +436,24 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
           data-dano="${danoRolado ?? 0}"
           data-tipo-dano="${tipoDano}"
           data-poder="1"
-          style="flex:1;padding:8px;border-radius:5px;cursor:pointer;font-size:0.88em;
+          title="Sucesso: ÷4 | Falha: ÷2"
+          style="flex:1;padding:5px 3px;border-radius:4px;cursor:pointer;font-size:0.78em;
             background:linear-gradient(135deg,#1a3a4a,#1a4a6a);
-            border:1px solid #2a6a8a;color:#fff;font-weight:bold"
-          title="Sucesso: ÷4 | Falha: ÷2">
-          🛡️ Com Poder${danoRolado ? ` (${Math.floor(danoRolado/4)} / ${Math.floor(danoRolado/2)})` : ""}
+            border:1px solid #2a6a8a;color:#fff;font-weight:bold">
+          🛡️ Evasão
+        </button>
+        <button class="t20-custom"
+          data-salv-pericia="${salvPericia}"
+          data-salv-label="${salvLabel}"
+          data-cd="${cd}"
+          data-item="${nomeItem}"
+          data-dano="${danoRolado ?? 0}"
+          data-tipo-dano="${tipoDano}"
+          title="Escolher atributo e bônus manualmente"
+          style="flex:1;padding:5px 3px;border-radius:4px;cursor:pointer;font-size:0.78em;
+            background:linear-gradient(135deg,#3a2a1a,#5a3a1a);
+            border:1px solid #8a5a2a;color:#fff;font-weight:bold">
+          ⚙️ Custom
         </button>
       </div>
     </div>`;
@@ -552,12 +566,159 @@ async function rolarSalvamento(btn) {
 }
 
 // Listener global persistente para botões de salvamento
-// Usa renderChatMessage (não Hooks.once) para funcionar para todos os jogadores
 Hooks.on("renderChatMessage", (message, html) => {
   html[0].querySelectorAll(".t20-salvar").forEach(btn => {
-    // Evita adicionar múltiplos listeners
     if (btn.dataset.listenerAdded) return;
     btn.dataset.listenerAdded = "1";
     btn.addEventListener("click", () => rolarSalvamento(btn));
   });
+  html[0].querySelectorAll(".t20-custom").forEach(btn => {
+    if (btn.dataset.listenerAdded) return;
+    btn.dataset.listenerAdded = "1";
+    btn.addEventListener("click", () => abrirDialogCustom(btn));
+  });
 });
+
+async function abrirDialogCustom(btn) {
+  const cd       = parseInt(btn.dataset.cd);
+  const nomeItem = btn.dataset.item;
+  const danoBase = parseInt(btn.dataset.dano) || 0;
+  const tipoDano = (btn.dataset.tipoDano ?? "").toLowerCase();
+
+  const actor = canvas.tokens.controlled[0]?.actor ?? game.user.character;
+  if (!actor) return ui.notifications.warn("Selecione seu token antes de rolar!");
+
+  // Calcular bônus de cada perícia de salvamento do personagem
+  const pericias = actor.system?.pericias ?? {};
+  const bRefl = pericias?.refl?.value ?? 0;
+  const bFort = pericias?.fort?.value ?? 0;
+  const bVont = pericias?.vont?.value ?? 0;
+
+  const conteudo = `
+    <div style="display:grid;gap:10px;padding:4px">
+      <div>
+        <label style="font-weight:bold;display:block;margin-bottom:4px">Atributo de salvamento:</label>
+        <select id="t20-custom-pericia" style="width:100%;padding:4px;border-radius:4px">
+          <option value="refl">Reflexos (+${bRefl})</option>
+          <option value="fort">Fortitude (+${bFort})</option>
+          <option value="vont">Vontade (+${bVont})</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-weight:bold;display:block;margin-bottom:4px">Bônus adicional:</label>
+        <input id="t20-custom-bonus" type="number" value="0"
+          style="width:100%;padding:4px;border-radius:4px;text-align:center"/>
+      </div>
+      <div>
+        <label style="font-weight:bold;display:block;margin-bottom:4px">Redução de dano:</label>
+        <select id="t20-custom-poder" style="width:100%;padding:4px;border-radius:4px">
+          <option value="0">Normal (sucesso ÷2 | falha total)</option>
+          <option value="1">Com poder (sucesso ÷4 | falha ÷2)</option>
+        </select>
+      </div>
+    </div>`;
+
+  new Dialog({
+    title: `⚙️ Salvamento Custom — ${nomeItem}`,
+    content: conteudo,
+    buttons: {
+      rolar: {
+        label: "🎲 Rolar",
+        callback: (html) => {
+          const pericia  = html.find("#t20-custom-pericia").val();
+          const bonus    = parseInt(html.find("#t20-custom-bonus").val()) || 0;
+          const temPoder = html.find("#t20-custom-poder").val() === "1";
+          const labels   = { refl: "Reflexos", fort: "Fortitude", vont: "Vontade" };
+
+          rolarSalvamentoCustom({
+            actor, cd, nomeItem, danoBase, tipoDano,
+            salvPericia: pericia,
+            salvLabel: labels[pericia],
+            bonusExtra: bonus,
+            temPoder,
+          });
+        }
+      },
+      cancelar: { label: "Cancelar" }
+    },
+    default: "rolar",
+  }).render(true);
+}
+
+async function rolarSalvamentoCustom({ actor, cd, nomeItem, danoBase, tipoDano,
+    salvPericia, salvLabel, bonusExtra, temPoder }) {
+
+  const pericias = actor.system?.pericias ?? {};
+  const bonus    = (pericias[salvPericia]?.value ?? 0) + bonusExtra;
+  const bonusStr = bonusExtra !== 0 ? ` ${bonusExtra > 0 ? "+" : ""}${bonusExtra} custom` : "";
+
+  const roll    = await new Roll(`1d20 + ${bonus}`).evaluate();
+  const sucesso = roll.total >= cd;
+  const cor     = sucesso ? "#27ae60" : "#e74c3c";
+  const label   = sucesso ? "✅ SUCESSO!" : "❌ FALHOU!";
+
+  let danoFinal = temPoder
+    ? (sucesso ? Math.floor(danoBase / 4) : Math.floor(danoBase / 2))
+    : (sucesso ? Math.floor(danoBase / 2) : danoBase);
+
+  let notaDano = "";
+
+  if (danoBase > 0) {
+    const tracos   = actor.system?.tracos?.resistencias ?? {};
+    const tipoNorm = tipoDano || null;
+    const traco    = tipoNorm ? tracos?.[tipoNorm] : null;
+
+    if (traco?.imunidade) {
+      danoFinal = 0;
+      notaDano  = `Imune a ${tipoDano}! Nenhum dano.`;
+    } else {
+      if (traco?.vulnerabilidade) {
+        danoFinal *= 2;
+        notaDano += ` (vuln. ${tipoDano}: ×2)`;
+      } else if (traco?.value > 0) {
+        const antes = danoFinal;
+        danoFinal   = Math.max(0, danoFinal - parseInt(traco.value));
+        notaDano   += ` (RD ${traco.value} [${tipoDano}]: ${antes}→${danoFinal})`;
+      }
+      const rdGeral = parseInt(tracos?.dano?.value) || parseInt(tracos?.dano?.base) || 0;
+      if (rdGeral > 0 && danoFinal > 0) {
+        const antes = danoFinal;
+        danoFinal   = Math.max(0, danoFinal - rdGeral);
+        notaDano   += ` (RD geral ${rdGeral}: ${antes}→${danoFinal})`;
+      }
+
+      const prefixo = temPoder
+        ? (sucesso ? `✅ Sucesso+Poder! ${danoBase}÷4=${Math.floor(danoBase/4)}` : `❌ Falhou+Poder! ${danoBase}÷2=${Math.floor(danoBase/2)}`)
+        : (sucesso ? `✅ Sucesso! ${danoBase}÷2=${Math.floor(danoBase/2)}` : `❌ Falhou! Dano total: ${danoBase}`);
+      notaDano = prefixo + notaDano;
+
+      if (danoFinal > 0) {
+        const hpPath  = "system.attributes.pv.value";
+        const pvAtual = foundry.utils.getProperty(actor, hpPath);
+        const pvMax   = foundry.utils.getProperty(actor, "system.attributes.pv.max") ?? pvAtual;
+        if (pvAtual !== undefined) {
+          const novoPV = Math.max(0, pvAtual - danoFinal);
+          await actor.update({ [hpPath]: novoPV });
+          const corPV = novoPV === 0 ? "red" : novoPV <= pvMax / 2 ? "orange" : "green";
+          notaDano += `<br>💔 ${danoFinal} de dano. PV: ${pvAtual} → <span style="color:${corPV}"><b>${novoPV}</b></span>`;
+          if (novoPV === 0) notaDano += "<br>💀 <b>Incapacitado!</b>";
+        }
+      } else {
+        notaDano += "<br>Nenhum dano aplicado.";
+      }
+    }
+  }
+
+  await roll.toMessage({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    flavor: `<b>${salvLabel}${bonusStr}</b> contra <i>${nomeItem}</i> (CD ${cd})`,
+  });
+
+  await ChatMessage.create({
+    content: `<div style="border-left:4px solid ${cor};padding:6px 10px;border-radius:0 4px 4px 0">
+      <div style="font-weight:bold;color:${cor}">${label} — ${actor.name}</div>
+      <div style="font-size:0.88em">${notaDano}</div>
+    </div>`,
+    speaker: ChatMessage.getSpeaker({ actor }),
+  });
+}

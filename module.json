@@ -1,23 +1,20 @@
 {
-  "id": "t20-attack-automation",
-  "title": "Tormenta20 - Automação de Ataques",
-  "description": "Automatiza ações de ataque para o sistema Tormenta20. Inclui rolagem automática de dano, aplicação de condições, verificação de acerto/crítico e muito mais.",
-  "version": "1.0.0",
+  "id": "arsenal-t20",
+  "title": "Arsenal T20",
+  "description": "Automação de combate para o sistema Tormenta20. Detecta acertos, erros e críticos, aplica dano com resistências, gera testes de resistência automáticos e aplica condições em caso de falha.",
+  "version": "1.6.0",
+  "compatibility": {
+    "minimum": "11",
+    "verified": "13"
+  },
   "authors": [
     {
       "name": "marlonsfc-eng"
     }
   ],
-  "compatibility": {
-    "minimum": "11",
-    "verified": "12"
-  },
+  "esmodules": [],
   "scripts": [
-    "scripts/hooks.js",
-    "scripts/attack-automation.js",
-    "scripts/damage-automation.js",
-    "scripts/condition-automation.js",
-    "scripts/ui.js"
+    "scripts/hooks.js"
   ],
   "styles": [
     "styles/t20-automation.css"
@@ -29,19 +26,7 @@
       "path": "lang/pt-BR.json"
     }
   ],
-  "socket": true,
-  "url": "https://github.com/marlonsfc-eng/t20-attack-automation",
-  "manifest": "https://raw.githubusercontent.com/marlonsfc-eng/t20-attack-automation/main/module.json",
-  "download": "https://github.com/marlonsfc-eng/t20-attack-automation/archive/refs/heads/main.zip",
-  "relationships": {
-    "systems": [
-      {
-        "id": "tormenta20",
-        "type": "system",
-        "compatibility": {
-          "minimum": "0.8.0"
-        }
-      }
-    ]
-  }
+  "url": "https://github.com/marlonsfc-eng/arsenal-t20",
+  "manifest": "https://raw.githubusercontent.com/marlonsfc-eng/arsenal-t20/main/module.json",
+  "download": "https://github.com/marlonsfc-eng/arsenal-t20/archive/refs/heads/main.zip"
 }

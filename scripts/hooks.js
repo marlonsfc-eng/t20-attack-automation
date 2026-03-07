@@ -1,9 +1,68 @@
 // hooks.js - Tormenta20 Attack Automation v1.6
 
 Hooks.once("ready", () => {
-  console.log("T20 Attack Automation | v1.6 carregado!");
-  ui.notifications.info("⚔️ T20 Attack Automation ativo!");
+  // Registrar configurações do módulo
+  const MOD = "arsenal-t20";
+
+  game.settings.register(MOD, "autoAtaque", {
+    name: "Automação de Ataque",
+    hint: "Detecta acerto, erro, crítico e erro natural. Exibe painel privado ao GM com DEF, PV e botões para aplicar dano com resistências.",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true,
+  });
+
+  game.settings.register(MOD, "autoSalvamento", {
+    name: "Testes de Resistência",
+    hint: "Ao lançar magias/poderes com resistência, exibe card no chat com botões para jogadores rolarem o teste (CD calculado automaticamente).",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true,
+  });
+
+  game.settings.register(MOD, "autoCondicoes", {
+    name: "Aplicar Condições Automaticamente",
+    hint: "Ao falhar/passar num teste de resistência, aplica automaticamente as condições listadas na descrição da magia (ex: Fatigado, Apavorado).",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true,
+  });
+
+  game.settings.register(MOD, "mensagemPublica", {
+    name: "Mensagem Pública de Ataque",
+    hint: "Exibe mensagem no chat visível a todos os jogadores indicando acerto/erro, sem revelar DEF ou PV do alvo.",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true,
+  });
+
+  game.settings.register(MOD, "danoAutoGM", {
+    name: "Painel de Dano do GM",
+    hint: "Exibe painel privado ao GM com DEF, PV, resistências do alvo e botões para aplicar dano com um clique.",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true,
+  });
+
+  const ativas = [];
+  if (game.settings.get(MOD, "autoAtaque"))      ativas.push("Ataque");
+  if (game.settings.get(MOD, "autoSalvamento"))  ativas.push("Salvamento");
+  if (game.settings.get(MOD, "autoCondicoes"))   ativas.push("Condições");
+
+  console.log(`Arsenal T20 | v1.6 carregado! Ativas: ${ativas.join(", ") || "nenhuma"}`);
+  if (game.user.isGM) ui.notifications.info("⚔️ Arsenal T20 ativo!");
 });
+
+// Helper para verificar configurações
+function cfg(chave) {
+  try { return game.settings.get("arsenal-t20", chave); }
+  catch { return true; } // fallback: ativo por padrão
+}
 
 // Extrai { tipo: total } ignorando operadores e termos sem valor numérico
 function extrairDanoPorTipo(roll) {
@@ -54,6 +113,7 @@ function calcularDanoComResistencias(valorBase, tipoNorm, tracos) {
 }
 
 Hooks.on("createChatMessage", async (message, options, userId) => {
+  if (!cfg("autoAtaque")) return;
   if (!message.rolls?.length) return;
   if (userId !== game.userId) return;
 
@@ -97,12 +157,12 @@ Hooks.on("createChatMessage", async (message, options, userId) => {
     };
   });
 
-  await criarMensagemPublica(totalAtaque, dadosAlvos);
+  if (cfg("mensagemPublica")) await criarMensagemPublica(totalAtaque, dadosAlvos);
 
   if (game.user.isGM) {
-    await criarMensagemGM(totalAtaque, dadosAlvos, danoPorTipo, rollDano?.total ?? null);
+    if (cfg("danoAutoGM")) await criarMensagemGM(totalAtaque, dadosAlvos, danoPorTipo, rollDano?.total ?? null);
   } else {
-    game.socket.emit("module.t20-attack-automation", {
+    game.socket.emit("module.arsenal-t20", {
       tipo: "atacou",
       totalAtaque, dadosAlvos,
       danoPorTipo,
@@ -112,10 +172,10 @@ Hooks.on("createChatMessage", async (message, options, userId) => {
 });
 
 Hooks.once("ready", () => {
-  game.socket.on("module.t20-attack-automation", async (data) => {
+  game.socket.on("module.arsenal-t20", async (data) => {
     if (!game.user.isGM) return;
     if (data.tipo === "atacou") {
-      await criarMensagemGM(data.totalAtaque, data.dadosAlvos, data.danoPorTipo, data.danoTotal);
+      if (cfg("danoAutoGM")) await criarMensagemGM(data.totalAtaque, data.dadosAlvos, data.danoPorTipo, data.danoTotal);
     }
     if (data.tipo === "aplicarCondicoes") {
       const actor = game.actors.get(data.actorId);
@@ -315,6 +375,7 @@ const SALV_MAP = {
 };
 
 Hooks.on("createChatMessage", async (message, options, userId) => {
+  if (!cfg("autoSalvamento")) return;
   if (userId !== game.userId) return;
 
   const actorId = message.speaker?.actor;
@@ -455,11 +516,11 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
           data-condicoes-falhar="${condicoesAoFalhar.join(',')}"
           data-condicoes-passar="${condicoesAoPassar.join(',')}"
           data-poder="1"
-          title="Sucesso: ÷4 | Falha: ÷2"
+          title="Com poder — Sucesso: ÷4 | Falha: ÷2"
           style="flex:1;padding:5px 3px;border-radius:4px;cursor:pointer;font-size:0.78em;
             background:linear-gradient(135deg,#1a3a4a,#1a4a6a);
             border:1px solid #2a6a8a;color:#fff;font-weight:bold">
-          🛡️ Evasão
+          🛡️ Resistência
         </button>
         <button class="t20-custom"
           data-salv-pericia="${salvPericia}"
@@ -587,11 +648,11 @@ async function rolarSalvamento(btn) {
 
   // Aplicar condições baseado no resultado
   const condicoesAplicar = sucesso ? condicoesPassar : condicoesFalhar;
-  if (condicoesAplicar.length) {
+  if (cfg("autoCondicoes") && condicoesAplicar.length) {
     if (game.user.isGM) {
       await aplicarCondicoes(actor, condicoesAplicar, nomeItem);
     } else {
-      game.socket.emit("module.t20-attack-automation", {
+      game.socket.emit("module.arsenal-t20", {
         tipo: "aplicarCondicoes",
         actorId: actor.id,
         condicoes: condicoesAplicar,
@@ -765,11 +826,11 @@ async function rolarSalvamentoCustom({ actor, cd, nomeItem, danoBase, tipoDano,
   });
 
   const condicoesAplicar2 = sucesso ? condicoesPassar : condicoesFalhar;
-  if (condicoesAplicar2.length) {
+  if (cfg("autoCondicoes") && condicoesAplicar2.length) {
     if (game.user.isGM) {
       await aplicarCondicoes(actor, condicoesAplicar2, nomeItem);
     } else {
-      game.socket.emit("module.t20-attack-automation", {
+      game.socket.emit("module.arsenal-t20", {
         tipo: "aplicarCondicoes",
         actorId: actor.id,
         condicoes: condicoesAplicar2,

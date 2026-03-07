@@ -377,9 +377,11 @@ Hooks.on("createChatMessage", async (message, options, userId) => {
   const rollDanoMagia = message.rolls?.find(r => !r.formula?.includes("d20"));
   const danoRolado = rollDanoMagia?.total ?? null;
 
-  // Detectar condições mencionadas na descrição do item
-  const descricaoTexto = itemData?.description?.value?.replace(/<[^>]+>/g, " ") ?? "";
-  const condicoes = detectarCondicoes(descricaoTexto + " " + (resistencia.txt ?? ""));
+  // Detectar condições via IA
+  const descricaoTexto = itemData?.description?.value ?? "";
+  const condicoesIA = await detectarCondicoesIA(nomeItem, descricaoTexto, resistencia.txt ?? "");
+  const condicoesAoFalhar = condicoesIA.aoFalhar ?? [];
+  const condicoesAoPassar = condicoesIA.aoPassar ?? [];
 
   await criarCartaoSalvamento({
     nomeItem,
@@ -393,12 +395,14 @@ Hooks.on("createChatMessage", async (message, options, userId) => {
     tipoDano,
     formulaDano,
     danoRolado,
-    condicoes,
+    condicoesAoFalhar,
+    condicoesAoPassar,
   });
 });
 
 async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
-    salvLabel, salvPericia, salvAtributo, cd, efeitoSucesso, tipoDano, formulaDano, danoRolado, condicoes = [] }) {
+    salvLabel, salvPericia, salvAtributo, cd, efeitoSucesso, tipoDano, formulaDano, danoRolado,
+    condicoesAoFalhar = [], condicoesAoPassar = [] }) {
 
   const html = `
     <div style="
@@ -421,7 +425,8 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
         🎲 Teste de <b style="color:#e8d5b7">${salvLabel}</b> CD ${cd}
         ${efeitoSucesso ? `<br>✅ Sucesso: ${efeitoSucesso}` : ""}
         ${formulaDano   ? `<br>💥 Dano: ${formulaDano}${tipoDano ? ` [${tipoDano}]` : ""}` : ""}
-        ${condicoes.length ? `<br>🔮 Falha aplica: <b>${condicoes.map(id => CONFIG.statusEffects.find(e=>e.id===id)?.name ?? id).join(", ")}</b>` : ""}
+        ${condicoesAoFalhar.length ? `<br>❌ Falha aplica: <b>${condicoesAoFalhar.map(id => CONFIG.statusEffects.find(e=>e.id===id)?.name ?? id).join(", ")}</b>` : ""}
+        ${condicoesAoPassar.length ? `<br>✅ Sucesso aplica: <b>${condicoesAoPassar.map(id => CONFIG.statusEffects.find(e=>e.id===id)?.name ?? id).join(", ")}</b>` : ""}
       </div>
       <div style="display:flex;gap:4px;margin-top:6px">
         <button class="t20-salvar"
@@ -431,7 +436,8 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
           data-item="${nomeItem}"
           data-dano="${danoRolado ?? 0}"
           data-tipo-dano="${tipoDano}"
-          data-condicoes="${condicoes.join(',')}"
+          data-condicoes-falhar="${condicoesAoFalhar.join(',')}"
+          data-condicoes-passar="${condicoesAoPassar.join(',')}"
           data-poder="0"
           title="Sucesso: ÷2 | Falha: total"
           style="flex:1;padding:5px 3px;border-radius:4px;cursor:pointer;font-size:0.78em;
@@ -446,7 +452,8 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
           data-item="${nomeItem}"
           data-dano="${danoRolado ?? 0}"
           data-tipo-dano="${tipoDano}"
-          data-condicoes="${condicoes.join(',')}"
+          data-condicoes-falhar="${condicoesAoFalhar.join(',')}"
+          data-condicoes-passar="${condicoesAoPassar.join(',')}"
           data-poder="1"
           title="Sucesso: ÷4 | Falha: ÷2"
           style="flex:1;padding:5px 3px;border-radius:4px;cursor:pointer;font-size:0.78em;
@@ -461,7 +468,8 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
           data-item="${nomeItem}"
           data-dano="${danoRolado ?? 0}"
           data-tipo-dano="${tipoDano}"
-          data-condicoes="${condicoes.join(',')}"
+          data-condicoes-falhar="${condicoesAoFalhar.join(',')}"
+          data-condicoes-passar="${condicoesAoPassar.join(',')}"
           title="Escolher atributo e bônus manualmente"
           style="flex:1;padding:5px 3px;border-radius:4px;cursor:pointer;font-size:0.78em;
             background:linear-gradient(135deg,#3a2a1a,#5a3a1a);
@@ -483,7 +491,8 @@ async function rolarSalvamento(btn) {
   const danoBase    = parseInt(btn.dataset.dano) || 0;
   const tipoDano    = (btn.dataset.tipoDano ?? "").toLowerCase();
   const temPoder    = btn.dataset.poder === "1";
-  const condicoes   = (btn.dataset.condicoes ?? "").split(",").filter(Boolean);
+  const condicoesFalhar = (btn.dataset.condicoesFalhar ?? "").split(",").filter(Boolean);
+  const condicoesPassar = (btn.dataset.condicoesPassar ?? "").split(",").filter(Boolean);
 
   const actor = canvas.tokens.controlled[0]?.actor ?? game.user.character;
   if (!actor) return ui.notifications.warn("Selecione seu token antes de rolar!");
@@ -576,15 +585,16 @@ async function rolarSalvamento(btn) {
     speaker: ChatMessage.getSpeaker({ actor }),
   });
 
-  // Aplicar condições em caso de falha
-  if (!sucesso && condicoes.length) {
+  // Aplicar condições baseado no resultado
+  const condicoesAplicar = sucesso ? condicoesPassar : condicoesFalhar;
+  if (condicoesAplicar.length) {
     if (game.user.isGM) {
-      await aplicarCondicoes(actor, condicoes, nomeItem);
+      await aplicarCondicoes(actor, condicoesAplicar, nomeItem);
     } else {
       game.socket.emit("module.t20-attack-automation", {
         tipo: "aplicarCondicoes",
         actorId: actor.id,
-        condicoes,
+        condicoes: condicoesAplicar,
         nomeItem,
       });
     }
@@ -612,7 +622,8 @@ async function abrirDialogCustom(btn) {
   const nomeItem = btn.dataset.item;
   const danoBase  = parseInt(btn.dataset.dano) || 0;
   const tipoDano  = (btn.dataset.tipoDano ?? "").toLowerCase();
-  const condicoes = (btn.dataset.condicoes ?? "").split(",").filter(Boolean);
+  const condicoesFalhar = (btn.dataset.condicoesFalhar ?? "").split(",").filter(Boolean);
+  const condicoesPassar = (btn.dataset.condicoesPassar ?? "").split(",").filter(Boolean);
 
   const actor = canvas.tokens.controlled[0]?.actor ?? game.user.character;
   if (!actor) return ui.notifications.warn("Selecione seu token antes de rolar!");
@@ -665,7 +676,8 @@ async function abrirDialogCustom(btn) {
             salvLabel: labels[pericia],
             bonusExtra: bonus,
             temPoder,
-            condicoes,
+            condicoesFalhar,
+            condicoesPassar,
           });
         }
       },
@@ -676,7 +688,7 @@ async function abrirDialogCustom(btn) {
 }
 
 async function rolarSalvamentoCustom({ actor, cd, nomeItem, danoBase, tipoDano,
-    salvPericia, salvLabel, bonusExtra, temPoder, condicoes = [] }) {
+    salvPericia, salvLabel, bonusExtra, temPoder, condicoesFalhar = [], condicoesPassar = [] }) {
 
   const pericias = actor.system?.pericias ?? {};
   const bonus    = (pericias[salvPericia]?.value ?? 0) + bonusExtra;
@@ -752,14 +764,15 @@ async function rolarSalvamentoCustom({ actor, cd, nomeItem, danoBase, tipoDano,
     speaker: ChatMessage.getSpeaker({ actor }),
   });
 
-  if (!sucesso && condicoes.length) {
+  const condicoesAplicar2 = sucesso ? condicoesPassar : condicoesFalhar;
+  if (condicoesAplicar2.length) {
     if (game.user.isGM) {
-      await aplicarCondicoes(actor, condicoes, nomeItem);
+      await aplicarCondicoes(actor, condicoesAplicar2, nomeItem);
     } else {
       game.socket.emit("module.t20-attack-automation", {
         tipo: "aplicarCondicoes",
         actorId: actor.id,
-        condicoes,
+        condicoes: condicoesAplicar2,
         nomeItem,
       });
     }
@@ -817,14 +830,53 @@ const CONDICOES_MAP = {
   "sobrecarregado":"sobrecarregado",
 };
 
-// Detecta condições mencionadas no texto de um item
-function detectarCondicoes(texto) {
-  const lower = texto.toLowerCase();
-  const encontradas = new Set();
-  for (const [chave, id] of Object.entries(CONDICOES_MAP)) {
-    if (lower.includes(chave)) encontradas.add(id);
+// Usa Claude para interpretar condições do texto da magia
+async function detectarCondicoesIA(nomeItem, descricao, txtResistencia) {
+  const idsDisponiveis = Object.values(CONDICOES_MAP).filter((v,i,a) => a.indexOf(v)===i);
+  const nomesDisponiveis = idsDisponiveis.map(id =>
+    CONFIG.statusEffects.find(e => e.id === id)?.name ?? id
+  );
+
+  const prompt = `Você é um assistente de RPG analisando uma magia/poder do sistema Tormenta20.
+
+Nome: ${nomeItem}
+Descrição: ${descricao.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()}
+Texto de resistência: ${txtResistencia}
+
+Condições disponíveis no sistema (use EXATAMENTE estes IDs):
+${idsDisponiveis.map((id,i) => `${id} = ${nomesDisponiveis[i]}`).join(", ")}
+
+Analise o texto e retorne um JSON com esta estrutura exata:
+{
+  "aoFalhar": ["id1", "id2"],
+  "aoPassar": ["id1"],
+  "observacao": "texto opcional explicando a lógica"
+}
+
+Regras:
+- Liste APENAS condições que são APLICADAS como efeito direto, não as mencionadas como referência ou exemplo
+- Se uma condição só aparece como referência negativa (ex: "não ficará exausto"), NÃO inclua
+- Se uma condição se aplica em ambos os casos (falha e sucesso), coloque nos dois
+- Retorne SOMENTE o JSON, sem mais nada`;
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 300,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+    const data = await response.json();
+    const texto = data.content?.[0]?.text ?? "{}";
+    const clean = texto.replace(/```json|```/g, "").trim();
+    return JSON.parse(clean);
+  } catch (e) {
+    console.warn("T20 Automation | Erro ao detectar condições via IA:", e);
+    return { aoFalhar: [], aoPassar: [] };
   }
-  return [...encontradas];
 }
 
 // Aplica condições em um ator (requer permissão de GM ou owner)

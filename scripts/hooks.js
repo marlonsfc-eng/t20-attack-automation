@@ -4,22 +4,6 @@ Hooks.once("ready", () => {
   // Registrar configurações do módulo
   const MOD = "arsenal-t20";
 
-  game.settings.register(MOD, "tema", {
-    name: "Tema Visual",
-    hint: "Escolha o tema visual da interface. 'Nenhum' mantém o visual padrão do Foundry.",
-    scope: "client",
-    config: true,
-    type: String,
-    default: "nenhum",
-    choices: {
-      "nenhum":      "Nenhum (Foundry padrão)",
-      "arcano":      "Arcano (roxo escuro, azul, brilhos)",
-      "neutro":      "Neutro Elegante (cinza escuro, prata)",
-      "pergaminho":  "Pergaminho (bege, marrom, detalhes vermelhos)",
-    },
-    onChange: (valor) => aplicarTema(valor),
-  });
-
   game.settings.register(MOD, "autoAtaque", {
     name: "Automação de Ataque",
     hint: "Detecta acerto, erro, crítico e erro natural. Exibe painel privado ao GM com DEF, PV e botões para aplicar dano com resistências.",
@@ -73,19 +57,7 @@ Hooks.once("ready", () => {
   console.log(`Arsenal T20 | v1.6 carregado! Ativas: ${ativas.join(", ") || "nenhuma"}`);
   if (game.user.isGM) ui.notifications.info("⚔️ Arsenal T20 ativo!");
 
-  // Aplicar tema salvo
-  aplicarTema(game.settings.get(MOD, "tema"));
 });
-
-function aplicarTema(tema) {
-  document.body.classList.forEach(cls => {
-    if (cls.startsWith("arsenal-tema-")) document.body.classList.remove(cls);
-  });
-  if (tema && tema !== "nenhum") {
-    document.body.classList.add(`arsenal-tema-${tema}`);
-    console.log(`Arsenal T20 | Tema aplicado: ${tema}`);
-  }
-}
 
 // Helper para verificar configurações
 function cfg(chave) {

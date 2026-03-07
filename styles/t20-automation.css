@@ -1,454 +1,673 @@
 /* ============================================================
-   Arsenal T20 — Sistema de Temas
+   Arsenal T20 — Sistema de Temas v1.7
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=IM+Fell+English:ital@0;1&display=swap');
 
 /* ============================================================
-   TEMA: ARCANO
-   Roxo escuro, azul profundo, brilhos mágicos
+   VARIÁVEIS DOS TEMAS
    ============================================================ */
+
 body.arsenal-tema-arcano {
-  --t-bg:          #07070f;
-  --t-bg-meio:     #0d0d1a;
-  --t-bg-claro:    #141428;
-  --t-cinza:       #1e1e38;
-  --t-borda:       #2e2e52;
-  --t-primario:    #7b5ea7;
-  --t-primario-brilho: #a07fd4;
-  --t-primario-escuro: #3d2d6a;
-  --t-acento:      #3a7bd5;
-  --t-acento-brilho: #5a9bf5;
-  --t-texto:       #c8bde8;
-  --t-texto-claro: #e0d8f8;
-  --t-texto-fraco: #5a527a;
-  --t-fonte-titulo: 'Cinzel', serif;
-  --t-fonte-corpo:  'Crimson Text', serif;
+  --t-bg:              #08081a;
+  --t-bg-painel:       #10102a;
+  --t-bg-item:         #16163a;
+  --t-borda:           #2a2a5a;
+  --t-borda-acento:    #5a3a9a;
+  --t-primario:        #9a7fd4;       /* roxo claro — títulos, destaques */
+  --t-acento:          #3a7bd5;       /* azul — botão principal */
+  --t-acento2:         #7b3ad5;       /* roxo — botão secundário */
+  --t-texto:           #ddd8f8;       /* texto principal — alto contraste */
+  --t-texto-fraco:     #8880b8;       /* texto secundário */
+  --t-fonte-titulo:    'Cinzel', serif;
+  --t-fonte-corpo:     'Crimson Text', serif;
 }
 
-/* ============================================================
-   TEMA: NEUTRO ELEGANTE
-   Cinza escuro, prata, minimalista
-   ============================================================ */
 body.arsenal-tema-neutro {
-  --t-bg:          #0e0e10;
-  --t-bg-meio:     #141416;
-  --t-bg-claro:    #1c1c20;
-  --t-cinza:       #252528;
-  --t-borda:       #333338;
-  --t-primario:    #9a9aaa;
-  --t-primario-brilho: #c8c8d8;
-  --t-primario-escuro: #4a4a58;
-  --t-acento:      #c0392b;
-  --t-acento-brilho: #e74c3c;
-  --t-texto:       #c4c4cc;
-  --t-texto-claro: #e0e0e8;
-  --t-texto-fraco: #5a5a64;
-  --t-fonte-titulo: 'Cinzel', serif;
-  --t-fonte-corpo:  'Crimson Text', serif;
+  --t-bg:              #0e0e10;
+  --t-bg-painel:       #161618;
+  --t-bg-item:         #1e1e22;
+  --t-borda:           #303038;
+  --t-borda-acento:    #606070;
+  --t-primario:        #c0c0d0;       /* prata — títulos, destaques */
+  --t-acento:          #c0392b;       /* vermelho — botão principal */
+  --t-acento2:         #555568;       /* cinza-azul — botão secundário */
+  --t-texto:           #e0e0e8;       /* texto principal */
+  --t-texto-fraco:     #808090;       /* texto secundário */
+  --t-fonte-titulo:    'Cinzel', serif;
+  --t-fonte-corpo:     'Crimson Text', serif;
+}
+
+body.arsenal-tema-pergaminho {
+  --t-bg:              #181008;
+  --t-bg-painel:       #221808;
+  --t-bg-item:         #2e2010;
+  --t-borda:           #4a3018;
+  --t-borda-acento:    #8a5820;
+  --t-primario:        #d4a84a;       /* dourado — títulos, destaques */
+  --t-acento:          #8b1a1a;       /* vermelho — botão principal */
+  --t-acento2:         #5a3a10;       /* marrom — botão secundário */
+  --t-texto:           #e8d5b0;       /* texto principal */
+  --t-texto-fraco:     #907858;       /* texto secundário */
+  --t-fonte-titulo:    'IM Fell English', serif;
+  --t-fonte-corpo:     'Crimson Text', serif;
 }
 
 /* ============================================================
-   TEMA: PERGAMINHO
-   Bege envelhecido, marrom, sépia, detalhes vermelho
+   BASE — aplicado em todos os temas
    ============================================================ */
-body.arsenal-tema-pergaminho {
-  --t-bg:          #1a1208;
-  --t-bg-meio:     #221808;
-  --t-bg-claro:    #2e2010;
-  --t-cinza:       #3a2c18;
-  --t-borda:       #5a4028;
-  --t-primario:    #c8932a;
-  --t-primario-brilho: #e8b84a;
-  --t-primario-escuro: #7a5010;
-  --t-acento:      #8b1a1a;
-  --t-acento-brilho: #c0392b;
-  --t-texto:       #d4b896;
-  --t-texto-claro: #e8d0b0;
-  --t-texto-fraco: #7a5a3a;
-  --t-fonte-titulo: 'IM Fell English', serif;
-  --t-fonte-corpo:  'Crimson Text', serif;
-}
 
-/* ============================================================
-   ESTILOS APLICADOS — todos os temas usam as variáveis --t-*
-   ============================================================ */
-body.arsenal-tema-arcano,
-body.arsenal-tema-neutro,
-body.arsenal-tema-pergaminho {
+body[class*="arsenal-tema"] {
   font-family: var(--t-fonte-corpo) !important;
   background: var(--t-bg) !important;
 }
 
-/* Títulos globais */
-body.arsenal-tema-arcano h1, body.arsenal-tema-arcano h2, body.arsenal-tema-arcano h3,
-body.arsenal-tema-arcano h4, body.arsenal-tema-arcano .window-title,
-body.arsenal-tema-neutro h1, body.arsenal-tema-neutro h2, body.arsenal-tema-neutro h3,
-body.arsenal-tema-neutro h4, body.arsenal-tema-neutro .window-title,
-body.arsenal-tema-pergaminho h1, body.arsenal-tema-pergaminho h2, body.arsenal-tema-pergaminho h3,
-body.arsenal-tema-pergaminho h4, body.arsenal-tema-pergaminho .window-title {
+body[class*="arsenal-tema"] h1,
+body[class*="arsenal-tema"] h2,
+body[class*="arsenal-tema"] h3,
+body[class*="arsenal-tema"] h4 {
   font-family: var(--t-fonte-titulo) !important;
-  letter-spacing: 0.04em;
+  color: var(--t-primario) !important;
+  letter-spacing: 0.04em !important;
 }
 
-/* Seletor de conveniência */
-.arsenal-t [class*="arsenal-tema-"] { /* placeholder */ }
+/* ── SIDEBAR ────────────────────────────────────────────── */
 
-/* ── SIDEBAR ─────────────────────────────────────────────── */
 body[class*="arsenal-tema"] #sidebar {
-  background: linear-gradient(180deg, var(--t-bg-meio) 0%, var(--t-bg) 100%) !important;
-  border-left: 2px solid var(--t-primario-escuro) !important;
-  box-shadow: -4px 0 20px rgba(0,0,0,0.7) !important;
+  background: var(--t-bg-painel) !important;
+  border-left: 2px solid var(--t-borda-acento) !important;
 }
+
 body[class*="arsenal-tema"] #sidebar-tabs {
   background: var(--t-bg) !important;
-  border-bottom: 1px solid var(--t-primario-escuro) !important;
+  border-bottom: 2px solid var(--t-borda-acento) !important;
 }
+
 body[class*="arsenal-tema"] #sidebar-tabs .item {
   color: var(--t-texto-fraco) !important;
   border-bottom: 2px solid transparent !important;
-  transition: all 0.2s !important;
+  transition: color 0.15s !important;
 }
+
 body[class*="arsenal-tema"] #sidebar-tabs .item:hover {
-  color: var(--t-primario-brilho) !important;
+  color: var(--t-texto) !important;
 }
+
 body[class*="arsenal-tema"] #sidebar-tabs .item.active {
-  color: var(--t-primario-brilho) !important;
+  color: var(--t-primario) !important;
   border-bottom-color: var(--t-primario) !important;
 }
-body[class*="arsenal-tema"] .directory-list .directory-item,
-body[class*="arsenal-tema"] .directory-list .document {
-  color: var(--t-texto) !important;
-  border-bottom: 1px solid rgba(90,90,90,0.2) !important;
-  transition: background 0.15s !important;
+
+/* Header das seções */
+body[class*="arsenal-tema"] #sidebar .directory-header,
+body[class*="arsenal-tema"] .sidebar-tab header.directory-header {
+  background: var(--t-bg-item) !important;
+  border-bottom: 1px solid var(--t-borda-acento) !important;
 }
-body[class*="arsenal-tema"] .directory-list .directory-item:hover,
-body[class*="arsenal-tema"] .directory-list .document:hover {
-  background: rgba(255,255,255,0.04) !important;
-  color: var(--t-texto-claro) !important;
-}
-body[class*="arsenal-tema"] .directory-list .folder-header {
-  background: linear-gradient(90deg, rgba(0,0,0,0.3), transparent) !important;
+
+body[class*="arsenal-tema"] #sidebar .directory-header h3,
+body[class*="arsenal-tema"] .sidebar-tab header h3 {
   color: var(--t-primario) !important;
   font-family: var(--t-fonte-titulo) !important;
-  font-size: 0.8em !important;
-  letter-spacing: 0.06em !important;
+  font-size: 0.85em !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+}
+
+/* Itens da lista */
+body[class*="arsenal-tema"] .directory-list .document,
+body[class*="arsenal-tema"] .directory-list .directory-item {
+  color: var(--t-texto) !important;
+  border-bottom: 1px solid var(--t-borda) !important;
+  padding: 4px 8px !important;
+}
+
+body[class*="arsenal-tema"] .directory-list .document:hover {
+  background: var(--t-bg-item) !important;
+  color: var(--t-primario) !important;
+}
+
+/* Pastas */
+body[class*="arsenal-tema"] .directory-list .folder-header {
+  background: var(--t-bg-item) !important;
+  color: var(--t-primario) !important;
+  font-family: var(--t-fonte-titulo) !important;
+  font-size: 0.78em !important;
+  letter-spacing: 0.08em !important;
   text-transform: uppercase !important;
   border-left: 3px solid var(--t-acento) !important;
+  padding: 4px 8px !important;
 }
-body[class*="arsenal-tema"] #sidebar .directory-header {
-  background: linear-gradient(90deg, var(--t-acento) 0%, var(--t-bg-meio) 100%) !important;
-  border-bottom: 1px solid var(--t-primario-escuro) !important;
-}
-body[class*="arsenal-tema"] #sidebar .directory-header h3 {
-  color: var(--t-primario-brilho) !important;
-  font-family: var(--t-fonte-titulo) !important;
-}
-body[class*="arsenal-tema"] #sidebar input[type="search"],
-body[class*="arsenal-tema"] #sidebar input[type="text"] {
-  background: var(--t-bg-claro) !important;
+
+/* Botões da sidebar */
+body[class*="arsenal-tema"] #sidebar button {
+  background: var(--t-bg-item) !important;
   border: 1px solid var(--t-borda) !important;
   color: var(--t-texto) !important;
   border-radius: 3px !important;
+  transition: all 0.15s !important;
+  font-family: var(--t-fonte-titulo) !important;
+  font-size: 0.78em !important;
 }
-body[class*="arsenal-tema"] #sidebar input:focus {
-  border-color: var(--t-primario-escuro) !important;
-  outline: none !important;
+
+body[class*="arsenal-tema"] #sidebar button:hover {
+  background: var(--t-acento) !important;
+  border-color: var(--t-acento) !important;
+  color: #fff !important;
+}
+
+/* Busca */
+body[class*="arsenal-tema"] #sidebar input[type="search"],
+body[class*="arsenal-tema"] #sidebar input[type="text"] {
+  background: var(--t-bg-item) !important;
+  border: 1px solid var(--t-borda) !important;
+  color: var(--t-texto) !important;
+  border-radius: 3px !important;
+  padding: 4px 8px !important;
 }
 
 /* ── CHAT ────────────────────────────────────────────────── */
+
+body[class*="arsenal-tema"] #chat-controls {
+  background: var(--t-bg-painel) !important;
+  border-top: 2px solid var(--t-borda-acento) !important;
+}
+
+body[class*="arsenal-tema"] #chat-form #chat-message {
+  background: var(--t-bg-item) !important;
+  border: 1px solid var(--t-borda) !important;
+  color: var(--t-texto) !important;
+  font-family: var(--t-fonte-corpo) !important;
+  font-size: 1em !important;
+  border-radius: 4px !important;
+}
+
+body[class*="arsenal-tema"] #chat-form #chat-message:focus {
+  border-color: var(--t-borda-acento) !important;
+  outline: none !important;
+}
+
+/* Mensagens */
 body[class*="arsenal-tema"] #chat-log .message {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--t-bg-meio) 95%, transparent), var(--t-bg)) !important;
-  border: 1px solid rgba(90,90,90,0.3) !important;
+  background: var(--t-bg-painel) !important;
+  border: 1px solid var(--t-borda) !important;
   border-left: 3px solid var(--t-borda) !important;
   border-radius: 0 4px 4px 0 !important;
   color: var(--t-texto) !important;
-  margin: 3px 2px !important;
-  transition: border-left-color 0.2s !important;
+  margin: 3px 0 !important;
 }
-body[class*="arsenal-tema"] #chat-log .message:hover {
-  border-left-color: var(--t-primario-escuro) !important;
-}
+
 body[class*="arsenal-tema"] #chat-log .message.whisper {
   border-left-color: var(--t-acento) !important;
+  background: color-mix(in srgb, var(--t-bg-painel) 90%, var(--t-acento)) !important;
 }
+
+body[class*="arsenal-tema"] .message-header {
+  border-bottom: 1px solid var(--t-borda) !important;
+  margin-bottom: 5px !important;
+}
+
 body[class*="arsenal-tema"] .message-header .message-sender {
-  color: var(--t-primario-brilho) !important;
+  color: var(--t-primario) !important;
   font-family: var(--t-fonte-titulo) !important;
   font-size: 0.85em !important;
+  font-weight: 600 !important;
 }
+
 body[class*="arsenal-tema"] .message-header .message-metadata {
   color: var(--t-texto-fraco) !important;
+  font-size: 0.75em !important;
 }
+
+body[class*="arsenal-tema"] .message .message-content {
+  color: var(--t-texto) !important;
+  font-size: 1em !important;
+  line-height: 1.5 !important;
+}
+
+/* Rolls */
+body[class*="arsenal-tema"] .dice-roll .dice-result {
+  background: var(--t-bg-item) !important;
+  border: 1px solid var(--t-borda) !important;
+  border-radius: 4px !important;
+}
+
 body[class*="arsenal-tema"] .dice-roll .dice-total {
-  color: var(--t-primario-brilho) !important;
+  color: var(--t-primario) !important;
   font-family: var(--t-fonte-titulo) !important;
-  font-size: 1.6em !important;
-  text-shadow: 0 0 12px color-mix(in srgb, var(--t-primario) 60%, transparent) !important;
+  font-size: 1.8em !important;
+  font-weight: 700 !important;
 }
+
 body[class*="arsenal-tema"] .dice-roll .dice-formula {
   color: var(--t-texto-fraco) !important;
+  font-size: 0.85em !important;
 }
-body[class*="arsenal-tema"] .dice-roll .dice-tooltip {
+
+body[class*="arsenal-tema"] .dice-tooltip {
   background: var(--t-bg) !important;
   border: 1px solid var(--t-borda) !important;
   color: var(--t-texto) !important;
 }
-body[class*="arsenal-tema"] #chat-form #chat-message {
-  background: var(--t-bg-claro) !important;
-  border: 1px solid var(--t-borda) !important;
-  color: var(--t-texto) !important;
-  border-radius: 4px !important;
-  font-family: var(--t-fonte-corpo) !important;
-}
-body[class*="arsenal-tema"] #chat-form #chat-message:focus {
-  border-color: var(--t-primario-escuro) !important;
-  outline: none !important;
-}
-body[class*="arsenal-tema"] #chat-controls {
-  background: var(--t-bg-meio) !important;
-  border-top: 1px solid var(--t-primario-escuro) !important;
-}
 
 /* ── HOTBAR ──────────────────────────────────────────────── */
+
 body[class*="arsenal-tema"] #hotbar {
-  background: linear-gradient(180deg, var(--t-bg-meio) 0%, var(--t-bg) 100%) !important;
-  border-top: 2px solid var(--t-primario-escuro) !important;
-  box-shadow: 0 -4px 20px rgba(0,0,0,0.7) !important;
+  background: var(--t-bg-painel) !important;
+  border-top: 2px solid var(--t-borda-acento) !important;
 }
+
 body[class*="arsenal-tema"] #hotbar .macro {
-  background: var(--t-bg-claro) !important;
+  background: var(--t-bg-item) !important;
   border: 1px solid var(--t-borda) !important;
   border-radius: 4px !important;
-  transition: all 0.2s ease !important;
+  transition: all 0.15s !important;
 }
+
 body[class*="arsenal-tema"] #hotbar .macro:hover {
   border-color: var(--t-primario) !important;
-  box-shadow: 0 0 10px color-mix(in srgb, var(--t-primario) 40%, transparent) !important;
   transform: translateY(-2px) !important;
 }
+
 body[class*="arsenal-tema"] #hotbar .macro .macro-key {
   background: var(--t-acento) !important;
   color: #fff !important;
   font-family: var(--t-fonte-titulo) !important;
+  font-size: 0.6em !important;
+  border-radius: 2px !important;
 }
+
 body[class*="arsenal-tema"] #hotbar .macro .macro-name {
   color: var(--t-texto-fraco) !important;
+  font-size: 0.6em !important;
 }
 
 /* ── CONTROLES ───────────────────────────────────────────── */
+
 body[class*="arsenal-tema"] #controls {
-  background: linear-gradient(180deg, var(--t-bg-meio), var(--t-bg)) !important;
-  border-right: 2px solid var(--t-primario-escuro) !important;
+  background: var(--t-bg-painel) !important;
+  border-right: 2px solid var(--t-borda-acento) !important;
 }
+
 body[class*="arsenal-tema"] #controls .scene-control,
 body[class*="arsenal-tema"] #controls .control-tool {
   color: var(--t-texto-fraco) !important;
-  transition: all 0.2s !important;
+  transition: all 0.15s !important;
 }
+
 body[class*="arsenal-tema"] #controls .scene-control:hover,
 body[class*="arsenal-tema"] #controls .control-tool:hover {
-  color: var(--t-primario-brilho) !important;
-  background: rgba(255,255,255,0.05) !important;
+  color: var(--t-texto) !important;
+  background: var(--t-bg-item) !important;
 }
+
 body[class*="arsenal-tema"] #controls .scene-control.active,
 body[class*="arsenal-tema"] #controls .control-tool.active {
-  color: var(--t-primario-brilho) !important;
-  background: color-mix(in srgb, var(--t-acento) 25%, transparent) !important;
+  color: var(--t-primario) !important;
+  background: var(--t-bg-item) !important;
   border-left: 2px solid var(--t-acento) !important;
 }
 
-/* ── JANELAS ─────────────────────────────────────────────── */
+/* ── JANELAS / APPS ──────────────────────────────────────── */
+
 body[class*="arsenal-tema"] .app.window-app {
-  background: linear-gradient(160deg, var(--t-bg-meio) 0%, var(--t-bg) 100%) !important;
-  border: 1px solid var(--t-borda) !important;
-  border-top: 2px solid var(--t-primario-escuro) !important;
+  background: var(--t-bg-painel) !important;
+  border: 1px solid var(--t-borda-acento) !important;
+  border-top: 3px solid var(--t-primario) !important;
   border-radius: 6px !important;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.9) !important;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.8) !important;
   color: var(--t-texto) !important;
 }
+
 body[class*="arsenal-tema"] .app .window-header {
-  background: linear-gradient(90deg, var(--t-acento) 0%, var(--t-bg-meio) 60%, var(--t-bg) 100%) !important;
-  border-bottom: 1px solid var(--t-primario-escuro) !important;
-  border-radius: 4px 4px 0 0 !important;
+  background: var(--t-bg-item) !important;
+  border-bottom: 2px solid var(--t-borda-acento) !important;
+  border-radius: 3px 3px 0 0 !important;
   padding: 6px 12px !important;
 }
+
 body[class*="arsenal-tema"] .app .window-header .window-title {
-  color: var(--t-primario-brilho) !important;
+  color: var(--t-primario) !important;
   font-family: var(--t-fonte-titulo) !important;
   font-size: 0.95em !important;
   letter-spacing: 0.05em !important;
 }
+
 body[class*="arsenal-tema"] .app .window-header a.header-button {
   color: var(--t-texto-fraco) !important;
-  transition: color 0.2s !important;
 }
+
 body[class*="arsenal-tema"] .app .window-header a.header-button:hover {
-  color: var(--t-acento-brilho) !important;
+  color: var(--t-texto) !important;
 }
+
+/* Abas internas */
 body[class*="arsenal-tema"] .app nav.tabs {
-  background: var(--t-bg-claro) !important;
-  border-bottom: 1px solid var(--t-borda) !important;
+  background: var(--t-bg) !important;
+  border-bottom: 2px solid var(--t-borda) !important;
 }
+
 body[class*="arsenal-tema"] .app nav.tabs .item {
   color: var(--t-texto-fraco) !important;
   font-family: var(--t-fonte-titulo) !important;
   font-size: 0.8em !important;
-  transition: all 0.2s !important;
+  letter-spacing: 0.05em !important;
+  padding: 6px 10px !important;
+  transition: color 0.15s !important;
+  border-bottom: 2px solid transparent !important;
 }
-body[class*="arsenal-tema"] .app nav.tabs .item:hover { color: var(--t-primario-brilho) !important; }
+
+body[class*="arsenal-tema"] .app nav.tabs .item:hover {
+  color: var(--t-texto) !important;
+}
+
 body[class*="arsenal-tema"] .app nav.tabs .item.active {
-  color: var(--t-primario-brilho) !important;
-  border-bottom: 2px solid var(--t-primario) !important;
+  color: var(--t-primario) !important;
+  border-bottom-color: var(--t-primario) !important;
 }
+
+/* Conteúdo */
 body[class*="arsenal-tema"] .app .window-content {
   background: transparent !important;
   color: var(--t-texto) !important;
   scrollbar-width: thin !important;
-  scrollbar-color: var(--t-primario-escuro) var(--t-bg) !important;
+  scrollbar-color: var(--t-borda-acento) var(--t-bg) !important;
 }
-body[class*="arsenal-tema"] .app label,
-body[class*="arsenal-tema"] .form-group label {
+
+/* Labels — só uppercase nas configurações, não na ficha */
+body[class*="arsenal-tema"] .app.settings label,
+body[class*="arsenal-tema"] #settings label {
   color: var(--t-primario) !important;
   font-family: var(--t-fonte-titulo) !important;
-  font-size: 0.8em !important;
+  font-size: 0.78em !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.04em !important;
+  letter-spacing: 0.06em !important;
 }
+
+/* Labels da ficha — legíveis e normais */
+body[class*="arsenal-tema"] .tormenta20.sheet label {
+  color: var(--t-texto) !important;
+  font-family: var(--t-fonte-corpo) !important;
+  font-size: 1em !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+
+/* Inputs e selects */
 body[class*="arsenal-tema"] .app input[type="text"],
 body[class*="arsenal-tema"] .app input[type="number"],
 body[class*="arsenal-tema"] .app select,
 body[class*="arsenal-tema"] .app textarea {
-  background: var(--t-bg-claro) !important;
+  background: var(--t-bg-item) !important;
   border: 1px solid var(--t-borda) !important;
-  color: var(--t-texto-claro) !important;
+  color: var(--t-texto) !important;
   border-radius: 3px !important;
   font-family: var(--t-fonte-corpo) !important;
+  font-size: 1em !important;
 }
+
 body[class*="arsenal-tema"] .app input:focus,
 body[class*="arsenal-tema"] .app select:focus,
 body[class*="arsenal-tema"] .app textarea:focus {
-  border-color: var(--t-primario-escuro) !important;
+  border-color: var(--t-borda-acento) !important;
   outline: none !important;
 }
-body[class*="arsenal-tema"] .app button {
-  background: linear-gradient(135deg, var(--t-cinza), var(--t-bg-claro)) !important;
-  border: 1px solid var(--t-borda) !important;
+
+/* Botões gerais das janelas */
+body[class*="arsenal-tema"] .app button,
+body[class*="arsenal-tema"] .app .button {
+  background: var(--t-bg-item) !important;
+  border: 1px solid var(--t-borda-acento) !important;
   color: var(--t-texto) !important;
   font-family: var(--t-fonte-titulo) !important;
-  font-size: 0.8em !important;
+  font-size: 0.82em !important;
+  letter-spacing: 0.03em !important;
   border-radius: 3px !important;
-  transition: all 0.2s !important;
+  transition: all 0.15s !important;
+  padding: 4px 10px !important;
 }
-body[class*="arsenal-tema"] .app button:hover {
-  background: linear-gradient(135deg, var(--t-acento), var(--t-cinza)) !important;
-  border-color: var(--t-acento-brilho) !important;
+
+body[class*="arsenal-tema"] .app button:hover,
+body[class*="arsenal-tema"] .app .button:hover {
+  background: var(--t-acento) !important;
+  border-color: var(--t-acento) !important;
   color: #fff !important;
 }
+
+/* Cabeçalhos dentro de janelas */
 body[class*="arsenal-tema"] .app h2,
 body[class*="arsenal-tema"] .app h3 {
   color: var(--t-primario) !important;
-  border-bottom: 1px solid var(--t-primario-escuro) !important;
-  padding-bottom: 4px !important;
   font-family: var(--t-fonte-titulo) !important;
+  border-bottom: 1px solid var(--t-borda) !important;
+  padding-bottom: 4px !important;
+  margin-bottom: 8px !important;
 }
 
 /* ── FICHA T20 ───────────────────────────────────────────── */
+
 body[class*="arsenal-tema"] .tormenta20.sheet .window-content {
-  background: linear-gradient(160deg, var(--t-bg-meio) 0%, var(--t-bg) 100%) !important;
+  background: var(--t-bg-painel) !important;
+  color: var(--t-texto) !important;
 }
+
 body[class*="arsenal-tema"] .tormenta20.sheet .sheet-header {
-  background: linear-gradient(90deg, var(--t-acento) 0%, rgba(0,0,0,0.2) 60%, transparent 100%) !important;
-  border-bottom: 2px solid var(--t-primario-escuro) !important;
+  background: var(--t-bg-item) !important;
+  border-bottom: 2px solid var(--t-borda-acento) !important;
 }
+
 body[class*="arsenal-tema"] .tormenta20.sheet .charname input {
-  color: var(--t-primario-brilho) !important;
+  color: var(--t-primario) !important;
   font-family: var(--t-fonte-titulo) !important;
   font-size: 1.4em !important;
   background: transparent !important;
   border: none !important;
-  border-bottom: 1px solid var(--t-primario-escuro) !important;
+  border-bottom: 1px solid var(--t-borda-acento) !important;
 }
-body[class*="arsenal-tema"] .tormenta20.sheet .item-list .item {
-  border-bottom: 1px solid rgba(90,90,90,0.2) !important;
+
+/* Atributos — valores numéricos legíveis */
+body[class*="arsenal-tema"] .tormenta20.sheet .attribute input,
+body[class*="arsenal-tema"] .tormenta20.sheet input[type="number"] {
   color: var(--t-texto) !important;
-  transition: background 0.15s !important;
+  font-weight: 600 !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  font-size: 1em !important;
 }
+
+/* Itens da ficha */
+body[class*="arsenal-tema"] .tormenta20.sheet .item-list .item {
+  border-bottom: 1px solid var(--t-borda) !important;
+  color: var(--t-texto) !important;
+}
+
 body[class*="arsenal-tema"] .tormenta20.sheet .item-list .item:hover {
-  background: rgba(255,255,255,0.04) !important;
+  background: var(--t-bg-item) !important;
+}
+
+body[class*="arsenal-tema"] .tormenta20.sheet .item-name {
+  color: var(--t-texto) !important;
+  font-family: var(--t-fonte-corpo) !important;
 }
 
 /* ── COMBAT TRACKER ──────────────────────────────────────── */
+
 body[class*="arsenal-tema"] #combat .combatant {
-  background: var(--t-bg-claro) !important;
-  border: 1px solid rgba(90,90,90,0.3) !important;
+  background: var(--t-bg-item) !important;
+  border-bottom: 1px solid var(--t-borda) !important;
   color: var(--t-texto) !important;
-  transition: all 0.15s !important;
+  transition: background 0.15s !important;
 }
+
 body[class*="arsenal-tema"] #combat .combatant:hover {
-  background: rgba(255,255,255,0.03) !important;
-  border-color: var(--t-primario-escuro) !important;
+  background: color-mix(in srgb, var(--t-bg-item) 70%, var(--t-borda)) !important;
 }
+
 body[class*="arsenal-tema"] #combat .combatant.active {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--t-acento) 35%, transparent), var(--t-bg-claro)) !important;
-  border-left: 3px solid var(--t-acento-brilho) !important;
-  box-shadow: 0 0 12px color-mix(in srgb, var(--t-acento) 30%, transparent) !important;
+  background: color-mix(in srgb, var(--t-bg-item) 60%, var(--t-acento)) !important;
+  border-left: 3px solid var(--t-acento) !important;
 }
+
 body[class*="arsenal-tema"] #combat .combatant.active .token-name {
-  color: var(--t-primario-brilho) !important;
+  color: var(--t-primario) !important;
+  font-weight: 600 !important;
+}
+
+body[class*="arsenal-tema"] #combat .token-name {
+  color: var(--t-texto) !important;
+  font-family: var(--t-fonte-corpo) !important;
 }
 
 /* ── SCROLLBARS ──────────────────────────────────────────── */
-body[class*="arsenal-tema"] ::-webkit-scrollbar { width: 6px !important; }
+
+body[class*="arsenal-tema"] ::-webkit-scrollbar { width: 5px !important; }
 body[class*="arsenal-tema"] ::-webkit-scrollbar-track { background: var(--t-bg) !important; }
-body[class*="arsenal-tema"] ::-webkit-scrollbar-thumb { background: var(--t-primario-escuro) !important; border-radius: 3px !important; }
+body[class*="arsenal-tema"] ::-webkit-scrollbar-thumb { background: var(--t-borda-acento) !important; border-radius: 3px !important; }
 body[class*="arsenal-tema"] ::-webkit-scrollbar-thumb:hover { background: var(--t-primario) !important; }
 
+/* ── TOOLTIP ─────────────────────────────────────────────── */
+
+body[class*="arsenal-tema"] #tooltip {
+  background: var(--t-bg-item) !important;
+  border: 1px solid var(--t-borda-acento) !important;
+  color: var(--t-texto) !important;
+  font-family: var(--t-fonte-corpo) !important;
+  font-size: 0.9em !important;
+  border-radius: 4px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.7) !important;
+}
+
 /* ── NOTIFICATIONS ───────────────────────────────────────── */
+
 body[class*="arsenal-tema"] #notifications .notification {
-  background: var(--t-bg-meio) !important;
+  background: var(--t-bg-painel) !important;
   border-left: 3px solid var(--t-borda) !important;
   color: var(--t-texto) !important;
+  font-family: var(--t-fonte-corpo) !important;
 }
-body[class*="arsenal-tema"] #notifications .notification.info { border-left-color: var(--t-primario) !important; }
-body[class*="arsenal-tema"] #notifications .notification.error { border-left-color: var(--t-acento-brilho) !important; }
+body[class*="arsenal-tema"] #notifications .notification.info  { border-left-color: var(--t-primario) !important; }
+body[class*="arsenal-tema"] #notifications .notification.error { border-left-color: var(--t-acento) !important; }
 
 /* ── PAUSE ───────────────────────────────────────────────── */
+
 body[class*="arsenal-tema"] #pause figcaption {
-  color: var(--t-primario-brilho) !important;
+  color: var(--t-primario) !important;
   font-family: var(--t-fonte-titulo) !important;
   font-size: 1.5em !important;
-  text-shadow: 0 0 20px color-mix(in srgb, var(--t-primario) 60%, transparent), 0 2px 4px rgba(0,0,0,0.9) !important;
-  letter-spacing: 0.1em !important;
+  letter-spacing: 0.12em !important;
   text-transform: uppercase !important;
 }
 
-/* ── TOOLTIP ─────────────────────────────────────────────── */
-body[class*="arsenal-tema"] #tooltip {
-  background: var(--t-bg-meio) !important;
-  border: 1px solid var(--t-primario-escuro) !important;
+/* ============================================================
+   CARDS ARSENAL T20 — integrados ao tema ativo
+   ============================================================ */
+
+/* Wrapper base de todos os cards */
+body[class*="arsenal-tema"] .t20-card {
+  background: var(--t-bg-item) !important;
+  border: 1px solid var(--t-borda) !important;
+  border-top: 3px solid var(--t-primario) !important;
+  border-radius: 6px !important;
+  padding: 10px 12px !important;
   color: var(--t-texto) !important;
   font-family: var(--t-fonte-corpo) !important;
+  font-size: 0.95em !important;
+}
+
+/* Título do card */
+body[class*="arsenal-tema"] .t20-card-titulo {
+  color: var(--t-primario) !important;
+  font-family: var(--t-fonte-titulo) !important;
+  font-size: 1em !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.04em !important;
+  margin-bottom: 8px !important;
+  padding-bottom: 5px !important;
+  border-bottom: 1px solid var(--t-borda) !important;
+}
+
+/* Linha de resultado (acerto/erro) */
+body[class*="arsenal-tema"] .t20-resultado {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 4px 8px !important;
+  margin: 3px 0 !important;
+  border-radius: 3px !important;
+  border-left: 3px solid transparent !important;
+  background: color-mix(in srgb, var(--t-bg-painel) 80%, transparent) !important;
+}
+
+body[class*="arsenal-tema"] .t20-resultado.acerto  { border-left-color: #27ae60 !important; }
+body[class*="arsenal-tema"] .t20-resultado.erro     { border-left-color: var(--t-acento) !important; }
+body[class*="arsenal-tema"] .t20-resultado.critico  { border-left-color: #f39c12 !important; }
+
+body[class*="arsenal-tema"] .t20-resultado .t20-nome { color: var(--t-texto) !important; font-weight: 600 !important; }
+body[class*="arsenal-tema"] .t20-resultado .t20-label-acerto  { color: #27ae60 !important; font-weight: bold !important; }
+body[class*="arsenal-tema"] .t20-resultado .t20-label-erro    { color: var(--t-acento) !important; font-weight: bold !important; }
+body[class*="arsenal-tema"] .t20-resultado .t20-label-critico { color: #f39c12 !important; font-weight: bold !important; }
+
+/* Info de DEF/PV no painel GM */
+body[class*="arsenal-tema"] .t20-info-alvo {
+  color: var(--t-texto-fraco) !important;
+  font-size: 0.82em !important;
+  padding: 1px 8px 5px !important;
+}
+
+/* CD nos cards de salvamento */
+body[class*="arsenal-tema"] .t20-cd-valor {
+  color: var(--t-primario) !important;
+  font-family: var(--t-fonte-titulo) !important;
+  font-size: 1.5em !important;
+  font-weight: 700 !important;
+  text-align: center !important;
+  padding: 4px 0 !important;
+}
+
+/* Info de condições */
+body[class*="arsenal-tema"] .t20-condicao-falha { color: var(--t-acento) !important; font-size: 0.85em !important; }
+body[class*="arsenal-tema"] .t20-condicao-sucesso { color: #27ae60 !important; font-size: 0.85em !important; }
+
+/* Botões dos cards */
+body[class*="arsenal-tema"] .t20-btns {
+  display: flex !important;
+  gap: 5px !important;
+  margin-top: 8px !important;
+}
+
+body[class*="arsenal-tema"] .t20-btn {
+  flex: 1 !important;
+  padding: 5px 6px !important;
   border-radius: 4px !important;
+  border: none !important;
+  cursor: pointer !important;
+  font-family: var(--t-fonte-titulo) !important;
+  font-size: 0.78em !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.03em !important;
+  transition: filter 0.15s !important;
+  color: #fff !important;
 }
 
-/* ── PERGAMINHO: textura especial ────────────────────────── */
-body.arsenal-tema-pergaminho #sidebar,
-body.arsenal-tema-pergaminho .app.window-app {
-  background-image:
-    linear-gradient(160deg, var(--t-bg-meio) 0%, var(--t-bg) 100%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E") !important;
+body[class*="arsenal-tema"] .t20-btn:hover { filter: brightness(1.2) !important; }
+
+body[class*="arsenal-tema"] .t20-btn-acao   { background: var(--t-acento) !important; }
+body[class*="arsenal-tema"] .t20-btn-alt    { background: var(--t-acento2) !important; }
+body[class*="arsenal-tema"] .t20-btn-neutro {
+  background: var(--t-bg-item) !important;
+  border: 1px solid var(--t-borda-acento) !important;
+  color: var(--t-texto) !important;
 }
 
-/* ── ARCANO: glow especial nos dados ─────────────────────── */
-body.arsenal-tema-arcano .dice-roll .dice-total {
-  text-shadow:
-    0 0 10px #a07fd4,
-    0 0 20px rgba(123,94,167,0.4),
-    0 0 40px rgba(123,94,167,0.2) !important;
-}
-body.arsenal-tema-arcano #hotbar .macro:hover {
-  box-shadow:
-    0 0 10px rgba(123,94,167,0.4),
-    0 0 20px rgba(58,123,213,0.2) !important;
+/* Input de CD editável */
+body[class*="arsenal-tema"] .t20-cd-input {
+  background: var(--t-bg-painel) !important;
+  border: 1px solid var(--t-borda-acento) !important;
+  color: var(--t-primario) !important;
+  font-family: var(--t-fonte-titulo) !important;
+  font-size: 1.2em !important;
+  font-weight: 700 !important;
+  text-align: center !important;
+  border-radius: 4px !important;
+  width: 60px !important;
 }

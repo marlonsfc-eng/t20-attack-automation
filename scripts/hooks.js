@@ -832,7 +832,12 @@ const CONDICOES_MAP = {
 
 // Detecta condições com contexto — distingue "aplica X" de "não fica X" ou "como X"
 function detectarCondicoesContexto(nomeItem, descricao, txtResistencia) {
-  const texto = descricao.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").toLowerCase();
+  // Limpar HTML, links @uuid[...]{texto} → manter só o texto interno, e normalizar espaços
+  const texto = descricao
+    .replace(/@uuid\[[^\]]*\]\{([^}]*)\}/gi, "$1")  // @uuid[...]{abalado} → abalado
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
 
   const aoFalhar = new Set();
   const aoPassar = new Set();
@@ -851,8 +856,9 @@ function detectarCondicoesContexto(nomeItem, descricao, txtResistencia) {
 
   // Detectar blocos de texto separados por "se falhar" / "se passar"
   // Padrões: "se falhar... fica X", "falhar na resistência... X", "se passar... Y"
-  const blocoFalha  = texto.match(/(?:se falhar|falhar na resist[eê]ncia|ao falhar|em caso de falha)[^.]*\.?([^.]{0,300})/i)?.[1] ?? "";
-  const blocoSucesso = texto.match(/(?:se passar|passar na resist[eê]ncia|ao passar|em caso de sucesso|se resistir)[^.]*\.?([^.]{0,300})/i)?.[1] ?? "";
+  // Captura tudo após o marcador de falha/sucesso até o fim do trecho relevante
+  const blocoFalha   = texto.match(/(?:se falhar|falhar na resist[eê]ncia|ao falhar|em caso de falha)([^]*?)(?=se passar|se resistir|passar na resist|$)/i)?.[1]?.trim() ?? "";
+  const blocoSucesso = texto.match(/(?:se passar|passar na resist[eê]ncia|ao passar|em caso de sucesso|se resistir)([^]*?)(?=se falhar|ao falhar|$)/i)?.[1]?.trim() ?? "";
 
   // Se não achou blocos separados, tudo vai para aoFalhar (comportamento padrão)
   const textoPrincipal = blocoFalha || texto;

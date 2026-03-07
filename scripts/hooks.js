@@ -215,21 +215,18 @@ Hooks.once("ready", () => {
 
 async function criarMensagemPublica(totalAtaque, dadosAlvos) {
   let html = `
-    <div style="background:linear-gradient(135deg,#1a1200,#2a1e00);
-      border:2px solid #7a5a00;border-radius:8px;padding:10px;
-      color:#e8d5b7;font-family:'Palatino Linotype',serif;">
-      <div style="color:#c9a227;font-weight:bold;font-size:1.05em;margin-bottom:8px">
+    <div class="t20-card" style="background:linear-gradient(135deg,#1a1200,#2a1e00);border:1px solid #7a5a00;border-top:3px solid #c9a227;border-radius:6px;padding:10px;color:#e8d5b7;font-family:'Palatino Linotype',serif;">
+      <div class="t20-card-titulo" style="color:#c9a227;font-family:'Cinzel',serif;font-weight:bold;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #3a2a00;">
         ⚔️ Ataque — Total: ${totalAtaque}
       </div>`;
 
   for (const a of dadosAlvos) {
     const cor = a.erroNatural ? "#888" : a.possivelCritico && a.acertou ? "#ff6b35" : a.acertou ? "#27ae60" : "#e74c3c";
     const label = a.erroNatural ? "💨 Erro Natural" : a.possivelCritico && a.acertou ? "⚔️ CRÍTICO!" : a.acertou ? "✅ Acertou!" : "❌ Errou";
+    const classeRes = a.erroNatural ? "" : a.possivelCritico && a.acertou ? "critico" : a.acertou ? "acerto" : "erro";
     html += `
-      <div style="display:flex;justify-content:space-between;align-items:center;
-        padding:5px 8px;border-left:3px solid ${cor};margin-bottom:4px;
-        background:rgba(255,255,255,0.03);border-radius:0 4px 4px 0">
-        <b>${a.nome}</b>
+      <div class="t20-resultado ${classeRes}" style="border-left-color:${cor};">
+        <span class="t20-nome">${a.nome}</span>
         <span style="color:${cor};font-weight:bold">${label}</span>
       </div>`;
   }
@@ -241,9 +238,7 @@ async function criarMensagemGM(totalAtaque, dadosAlvos, danoPorTipo, danoTotal) 
   const temDano = danoPorTipo && Object.keys(danoPorTipo).length > 0;
 
   let html = `
-    <div style="background:linear-gradient(135deg,#0f0f1a,#1a1a2e);
-      border:2px solid #5a3a1a;border-radius:8px;padding:12px;
-      color:#e8d5b7;font-family:'Palatino Linotype',serif;">
+    <div class="t20-card" style="background:linear-gradient(135deg,#0f0f1a,#1a1a2e);border:1px solid #2a2a5a;border-top:3px solid #9a7fd4;border-radius:6px;padding:12px;color:#e8d5b7;font-family:'Palatino Linotype',serif;">
       <div style="border-bottom:1px solid #5a3a1a;padding-bottom:8px;margin-bottom:10px">
         <span style="color:#c9a227;font-weight:bold">🎲 Painel do GM — Ataque: ${totalAtaque}</span>
         ${temDano ? `<span style="float:right;color:#e74c3c;font-weight:bold">Dano base: ${danoTotal}</span>` : ""}
@@ -495,10 +490,7 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
     condicoesAoFalhar = [], condicoesAoPassar = [] }) {
 
   const html = `
-    <div style="
-      background:linear-gradient(135deg,#0a1a0a,#0f2a1a);
-      border:2px solid #1a6a2a;border-radius:8px;padding:12px;
-      color:#e8d5b7;font-family:'Palatino Linotype',serif;">
+    <div class="t20-card" style="background:linear-gradient(135deg,#0a1a0a,#0f2a1a);border:1px solid #1a4a1a;border-top:3px solid #27ae60;border-radius:6px;padding:12px;color:#e8d5b7;font-family:'Palatino Linotype',serif;">
       <div style="display:flex;align-items:center;gap:10px;
         border-bottom:1px solid #1a6a2a;padding-bottom:8px;margin-bottom:10px">
         ${imgItem ? `<img src="${imgItem}" style="width:34px;height:34px;border-radius:4px;border:1px solid #c9a227;object-fit:cover"/>` : ""}
@@ -519,7 +511,7 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
         ${condicoesAoPassar.length ? `<br>✅ Sucesso aplica: <b>${condicoesAoPassar.map(id => CONFIG.statusEffects.find(e=>e.id===id)?.name ?? id).join(", ")}</b>` : ""}
       </div>
       <div style="display:flex;gap:4px;margin-top:6px">
-        <button class="t20-salvar"
+        <button class="t20-salvar t20-btn-primario"
           data-salv-pericia="${salvPericia}"
           data-salv-label="${salvLabel}"
           data-cd="${cd}"
@@ -535,7 +527,7 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
             border:1px solid #3a8a3a;color:#fff;font-weight:bold">
           🎲 ${salvLabel}
         </button>
-        <button class="t20-salvar"
+        <button class="t20-salvar t20-btn-primario"
           data-salv-pericia="${salvPericia}"
           data-salv-label="${salvLabel}"
           data-cd="${cd}"

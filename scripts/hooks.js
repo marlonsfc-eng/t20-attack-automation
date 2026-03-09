@@ -543,6 +543,16 @@ async function rolarSalvamento(btn) {
   // T20 pode guardar em .value, .total, ou .mod — tenta os três
   const bonus    = pericia?.total ?? pericia?.value ?? pericia?.mod ?? 0;
 
+  // LOG de diagnóstico — aparece no console F12
+  console.log("Arsenal T20 | rolarSalvamento |", {
+    salvPericia,
+    pericia: JSON.stringify(pericia),
+    bonus,
+    cd,
+    actor: actor.name,
+    sistemaPericiasKeys: Object.keys(pericias).slice(0, 10),
+  });
+
   const roll    = await new Roll(`1d20 + ${bonus}`).evaluate();
   const sucesso = roll.total >= cd;
   const cor     = sucesso ? "#27ae60" : "#e74c3c";

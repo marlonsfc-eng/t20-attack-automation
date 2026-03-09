@@ -482,8 +482,8 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
         ${condicoesAoFalhar.length ? `<br>❌ Falha aplica: <b>${condicoesAoFalhar.map(id => CONFIG.statusEffects.find(e=>e.id===id)?.name ?? id).join(", ")}</b>` : ""}
         ${condicoesAoPassar.length ? `<br>✅ Sucesso aplica: <b>${condicoesAoPassar.map(id => CONFIG.statusEffects.find(e=>e.id===id)?.name ?? id).join(", ")}</b>` : ""}
       </div>
-      <div style="display:flex;gap:4px;margin-top:6px">
-        <button class="t20-salvar t20-btn-primario"
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button class="t20-salvar"
           data-salv-pericia="${salvPericia}"
           data-salv-label="${salvLabel}"
           data-cd="${cd}"
@@ -495,43 +495,10 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
           data-poder="0"
           data-evasao="0"
           title="Sucesso: ÷2 | Falha: total"
-          style="flex:1;padding:5px 3px;border-radius:4px;cursor:pointer;font-size:0.78em;
+          style="flex:2;padding:6px 4px;border-radius:4px;cursor:pointer;font-size:0.82em;
             background:linear-gradient(135deg,#1a4a1a,#2a6a2a);
             border:1px solid #3a8a3a;color:#fff;font-weight:bold">
           🎲 ${salvLabel}
-        </button>
-        <button class="t20-salvar t20-btn-primario"
-          data-salv-pericia="${salvPericia}"
-          data-salv-label="${salvLabel}"
-          data-cd="${cd}"
-          data-item="${nomeItem}"
-          data-dano="${danoRolado ?? 0}"
-          data-tipo-dano="${tipoDano}"
-          data-condicoes-falhar="${condicoesAoFalhar.join(',')}"
-          data-condicoes-passar="${condicoesAoPassar.join(',')}"
-          data-poder="0"
-          data-evasao="1"
-          title="Evasão Simples — Sucesso: sem dano | Falha: dano total"
-          style="flex:1;padding:5px 3px;border-radius:4px;cursor:pointer;font-size:0.78em;
-            background:linear-gradient(135deg,#2a3a1a,#3a5a1a);
-            border:1px solid #5a8a2a;color:#fff;font-weight:bold">
-          🌀 Evasão
-        </button>
-        <button class="t20-salvar t20-btn-primario"
-          data-salv-pericia="${salvPericia}"
-          data-salv-label="${salvLabel}"
-          data-cd="${cd}"
-          data-item="${nomeItem}"
-          data-dano="${danoRolado ?? 0}"
-          data-tipo-dano="${tipoDano}"
-          data-condicoes-falhar="${condicoesAoFalhar.join(',')}"
-          data-condicoes-passar="${condicoesAoPassar.join(',')}"
-          data-poder="1"
-          title="Com poder — Sucesso: ÷4 | Falha: ÷2"
-          style="flex:1;padding:5px 3px;border-radius:4px;cursor:pointer;font-size:0.78em;
-            background:linear-gradient(135deg,#1a3a4a,#1a4a6a);
-            border:1px solid #2a6a8a;color:#fff;font-weight:bold">
-          🛡️ Resistência
         </button>
         <button class="t20-custom"
           data-salv-pericia="${salvPericia}"
@@ -542,11 +509,11 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
           data-tipo-dano="${tipoDano}"
           data-condicoes-falhar="${condicoesAoFalhar.join(',')}"
           data-condicoes-passar="${condicoesAoPassar.join(',')}"
-          title="Escolher atributo e bônus manualmente"
-          style="flex:1;padding:5px 3px;border-radius:4px;cursor:pointer;font-size:0.78em;
+          title="Escolher atributo, bônus e habilidades"
+          style="flex:1;padding:6px 4px;border-radius:4px;cursor:pointer;font-size:0.82em;
             background:linear-gradient(135deg,#3a2a1a,#5a3a1a);
             border:1px solid #8a5a2a;color:#fff;font-weight:bold">
-          ⚙️ Custom
+          ⚙️ Modificador
         </button>
       </div>
     </div>`;
@@ -699,64 +666,150 @@ Hooks.on("renderChatMessage", (message, html) => {
 });
 
 async function abrirDialogCustom(btn) {
-  const cd       = parseInt(btn.dataset.cd);
-  const nomeItem = btn.dataset.item;
-  const danoBase  = parseInt(btn.dataset.dano) || 0;
-  const tipoDano  = (btn.dataset.tipoDano ?? "").toLowerCase();
+  const cd              = parseInt(btn.dataset.cd);
+  const nomeItem        = btn.dataset.item;
+  const danoBase        = parseInt(btn.dataset.dano) || 0;
+  const tipoDano        = (btn.dataset.tipoDano ?? "").toLowerCase();
+  const salvPericiaBase = btn.dataset.salvPericia ?? "refl";
   const condicoesFalhar = (btn.dataset.condicoesFalhar ?? "").split(",").filter(Boolean);
   const condicoesPassar = (btn.dataset.condicoesPassar ?? "").split(",").filter(Boolean);
 
   const actor = canvas.tokens.controlled[0]?.actor ?? game.user.character;
   if (!actor) return ui.notifications.warn("Selecione seu token antes de rolar!");
 
-  // Calcular bônus de cada perícia de salvamento do personagem
+  // Bônus de perícias de salvamento
   const pericias = actor.system?.pericias ?? {};
   const bRefl = pericias?.refl?.value ?? 0;
   const bFort = pericias?.fort?.value ?? 0;
   const bVont = pericias?.vont?.value ?? 0;
+  const labelPericia = { refl: "Reflexos", fort: "Fortitude", vont: "Vontade" };
+
+  // ── Coleta habilidades relevantes dos itens do personagem ──
+  // Busca poderes/habilidades que modificam testes de resistência
+  const PALAVRAS_CHAVE = [
+    "reflexos", "fortitude", "vontade", "salvamento", "resistência",
+    "evasão", "resistir", "teste de", "bônus em", "bonus em",
+  ];
+  const habilidades = [];
+  for (const item of actor.items) {
+    const nome = item.name ?? "";
+    const desc = (item.system?.description?.value ?? "").replace(/<[^>]+>/g, " ").toLowerCase();
+    const relevante = PALAVRAS_CHAVE.some(p => desc.includes(p) || nome.toLowerCase().includes(p));
+    if (!relevante) continue;
+
+    // Tenta extrair bônus numérico mencionado na descrição
+    const matchBonus = desc.match(/[+]\s*(\d+)\s*(?:em|nos?|nos?\s+testes?|de bônus)/i);
+    const bonusSugerido = matchBonus ? parseInt(matchBonus[1]) : null;
+
+    // Tenta detectar tipo de evasão
+    const eEvasaoApr = /evasão aprimorada/i.test(nome) || /evasão aprimorada/i.test(desc);
+    const eEvasaoSimp = !eEvasaoApr && (/evasão/i.test(nome) || /evasão/i.test(desc));
+
+    habilidades.push({
+      id:    item.id,
+      nome,
+      bonus: bonusSugerido,
+      evasaoAprimorada: eEvasaoApr,
+      evasaoSimples:    eEvasaoSimp,
+    });
+  }
+
+  // Monta opções de habilidades para o select
+  const opcoesHabilidades = habilidades.length > 0
+    ? habilidades.map(h => {
+        let label = h.nome;
+        if (h.evasaoAprimorada)  label += " — Evasão Aprimorada (÷4/÷2)";
+        else if (h.evasaoSimples) label += " — Evasão Simples (sem dano/total)";
+        else if (h.bonus !== null) label += ` — +${h.bonus} bônus`;
+        return `<option value="${h.id}"
+          data-bonus="${h.bonus ?? 0}"
+          data-evasao-apr="${h.evasaoAprimorada ? 1 : 0}"
+          data-evasao-simp="${h.evasaoSimples ? 1 : 0}">
+          ${label}
+        </option>`;
+      }).join("")
+    : `<option value="" disabled>Nenhuma habilidade encontrada</option>`;
 
   const conteudo = `
-    <div style="display:grid;gap:10px;padding:4px">
+    <div style="display:grid;gap:12px;padding:6px;font-family:'Crimson Text',serif">
+
       <div>
-        <label style="font-weight:bold;display:block;margin-bottom:4px">Atributo de salvamento:</label>
-        <select id="t20-custom-pericia" style="width:100%;padding:4px;border-radius:4px">
-          <option value="refl">Reflexos (+${bRefl})</option>
-          <option value="fort">Fortitude (+${bFort})</option>
-          <option value="vont">Vontade (+${bVont})</option>
+        <label style="font-weight:bold;display:block;margin-bottom:4px;font-size:0.9em;text-transform:uppercase;letter-spacing:0.04em">
+          Atributo de salvamento
+        </label>
+        <select id="t20-mod-pericia" style="width:100%;padding:5px;border-radius:4px">
+          <option value="refl" ${salvPericiaBase === "refl" ? "selected" : ""}>Reflexos (+${bRefl})</option>
+          <option value="fort" ${salvPericiaBase === "fort" ? "selected" : ""}>Fortitude (+${bFort})</option>
+          <option value="vont" ${salvPericiaBase === "vont" ? "selected" : ""}>Vontade (+${bVont})</option>
         </select>
       </div>
+
       <div>
-        <label style="font-weight:bold;display:block;margin-bottom:4px">Bônus adicional:</label>
-        <input id="t20-custom-bonus" type="number" value="0"
-          style="width:100%;padding:4px;border-radius:4px;text-align:center"/>
+        <label style="font-weight:bold;display:block;margin-bottom:4px;font-size:0.9em;text-transform:uppercase;letter-spacing:0.04em">
+          Bônus adicional
+        </label>
+        <input id="t20-mod-bonus" type="number" value="0"
+          style="width:100%;padding:5px;border-radius:4px;text-align:center"/>
       </div>
+
       <div>
-        <label style="font-weight:bold;display:block;margin-bottom:4px">Redução de dano:</label>
-        <select id="t20-custom-poder" style="width:100%;padding:4px;border-radius:4px">
-          <option value="0">Normal (sucesso ÷2 | falha total)</option>
-          <option value="1">Com poder (sucesso ÷4 | falha ÷2)</option>
+        <label style="font-weight:bold;display:block;margin-bottom:4px;font-size:0.9em;text-transform:uppercase;letter-spacing:0.04em">
+          Habilidade especial
+        </label>
+        <select id="t20-mod-habilidade" style="width:100%;padding:5px;border-radius:4px">
+          <option value="" data-bonus="0" data-evasao-apr="0" data-evasao-simp="0">
+            — Nenhuma —
+          </option>
+          ${opcoesHabilidades}
         </select>
+        <div id="t20-mod-preview" style="margin-top:5px;font-size:0.82em;color:#888;min-height:1.2em"></div>
       </div>
-    </div>`;
+
+    </div>
+    <script>
+      // Preview ao trocar habilidade
+      document.getElementById("t20-mod-habilidade")?.addEventListener("change", function() {
+        const opt = this.options[this.selectedIndex];
+        const bonus    = parseInt(opt.dataset.bonus) || 0;
+        const evaApr   = opt.dataset.evasaoApr === "1";
+        const evaSimp  = opt.dataset.evasaoSimp === "1";
+        const prev     = document.getElementById("t20-mod-preview");
+        if (evaApr)       prev.textContent = "Evasão Aprimorada: sucesso ÷4 | falha ÷2";
+        else if (evaSimp) prev.textContent = "Evasão Simples: sucesso sem dano | falha total";
+        else if (bonus)   prev.textContent = "Adiciona +" + bonus + " ao bônus do teste";
+        else              prev.textContent = "";
+      });
+    </script>`;
 
   new Dialog({
-    title: `⚙️ Salvamento Custom — ${nomeItem}`,
+    title: `⚙️ Modificador — ${nomeItem}`,
     content: conteudo,
     buttons: {
       rolar: {
         label: "🎲 Rolar",
         callback: (html) => {
-          const pericia  = html.find("#t20-custom-pericia").val();
-          const bonus    = parseInt(html.find("#t20-custom-bonus").val()) || 0;
-          const temPoder = html.find("#t20-custom-poder").val() === "1";
-          const labels   = { refl: "Reflexos", fort: "Fortitude", vont: "Vontade" };
+          const pericia = html.find("#t20-mod-pericia").val();
+          const bonusManual = parseInt(html.find("#t20-mod-bonus").val()) || 0;
+
+          // Lê habilidade selecionada
+          const sel      = html.find("#t20-mod-habilidade")[0];
+          const opt      = sel?.options[sel.selectedIndex];
+          const bonusHab = parseInt(opt?.dataset?.bonus) || 0;
+          const evaApr   = opt?.dataset?.evasaoApr === "1";
+          const evaSimp  = opt?.dataset?.evasaoSimp === "1";
+
+          // Evasão tem prioridade sobre bônus numérico
+          const temPoder = evaApr;
+          const evasaoSimples = evaSimp;
+          const bonusTotal = bonusManual + (evaApr || evaSimp ? 0 : bonusHab);
 
           rolarSalvamentoCustom({
             actor, cd, nomeItem, danoBase, tipoDano,
             salvPericia: pericia,
-            salvLabel: labels[pericia],
-            bonusExtra: bonus,
+            salvLabel:   labelPericia[pericia],
+            bonusExtra:  bonusTotal,
             temPoder,
+            evasaoSimples,
             condicoesFalhar,
             condicoesPassar,
           });
@@ -769,7 +822,7 @@ async function abrirDialogCustom(btn) {
 }
 
 async function rolarSalvamentoCustom({ actor, cd, nomeItem, danoBase, tipoDano,
-    salvPericia, salvLabel, bonusExtra, temPoder, condicoesFalhar = [], condicoesPassar = [] }) {
+    salvPericia, salvLabel, bonusExtra, temPoder, evasaoSimples = false, condicoesFalhar = [], condicoesPassar = [] }) {
 
   const pericias = actor.system?.pericias ?? {};
   const bonus    = (pericias[salvPericia]?.value ?? 0) + bonusExtra;
@@ -780,7 +833,7 @@ async function rolarSalvamentoCustom({ actor, cd, nomeItem, danoBase, tipoDano,
   const cor     = sucesso ? "#27ae60" : "#e74c3c";
   const label   = sucesso ? "✅ SUCESSO!" : "❌ FALHOU!";
 
-  const temEvasaoC = btn?.dataset?.evasao === "1";
+  const temEvasaoC = btn?.dataset?.evasao === "1" || evasaoSimples;
   let danoFinal = temPoder
     ? (sucesso ? Math.floor(danoBase / 4) : Math.floor(danoBase / 2))
     : temEvasaoC
@@ -1005,203 +1058,3 @@ async function aplicarCondicoes(actor, condicoes, nomeItem) {
 // ============================================================
 // CURA ACELERADA
 // ============================================================
-
-// Estado em memória: { actorId: { valor, ativo } }
-// ── Helpers de persistência: flags no Combat ─────────────
-// Salva/lê a lista de curas ativas como flag no combate ativo
-async function caSetFlag(actorId, valor, ativo) {
-  const combat = game.combat;
-  if (!combat) return;
-  const atual = caGetAll();
-  atual[actorId] = { valor, ativo };
-  await combat.setFlag("arsenal-t20", "curaAcelerada", atual);
-}
-
-async function caRemoveFlag(actorId) {
-  const combat = game.combat;
-  if (!combat) return;
-  const atual = caGetAll();
-  delete atual[actorId];
-  await combat.setFlag("arsenal-t20", "curaAcelerada", atual);
-}
-
-function caGetAll() {
-  return foundry.utils.deepClone(
-    game.combat?.getFlag("arsenal-t20", "curaAcelerada") ?? {}
-  );
-}
-
-function caGetActor(actorId) {
-  return caGetAll()[actorId] ?? null;
-}
-
-// ── Detecta "cura acelerada" em mensagens de chat ──────────
-Hooks.on("createChatMessage", async (message) => {
-  if (!game.user.isGM) return;
-
-  const texto    = message.content?.toLowerCase() ?? "";
-  const flags    = message.flags?.tormenta20 ?? {};
-  const itemData = flags.itemData ?? null;
-  const descItem = (itemData?.description?.value ?? "").toLowerCase();
-
-  const temCuraAcelerada = /cura\s+acelerada/.test(texto) || /cura\s+acelerada/.test(descItem);
-  if (!temCuraAcelerada) return;
-
-  const matchValor   = (texto + " " + descItem).match(/cura\s+acelerada[\s:(]+(\d+)/i);
-  const valorSugerido = matchValor ? parseInt(matchValor[1]) : "";
-
-  const speaker = message.speaker;
-  const actor   = speaker.token
-    ? game.scenes.active?.tokens.get(speaker.token)?.actor
-    : game.actors.get(speaker.actor);
-  if (!actor) return;
-
-  const resultado = await Dialog.prompt({
-    title: "⚕️ Cura Acelerada",
-    content: `
-      <div style="padding:10px;font-family:'Crimson Text',serif">
-        <p style="margin-bottom:8px">
-          <b style="color:#27ae60">${actor.name}</b> usou um poder com Cura Acelerada.<br>
-          Defina quantos PV serão recuperados por rodada:
-        </p>
-        <div style="display:flex;align-items:center;gap:10px">
-          <label style="font-weight:bold">PV por rodada:</label>
-          <input id="ca-valor" type="number" min="1" value="${valorSugerido}"
-            style="width:70px;padding:4px 8px;background:#1a1a26;border:1px solid #3a3a50;
-              color:#e8d5b7;border-radius:4px;font-size:1.1em;text-align:center">
-        </div>
-      </div>`,
-    label: "✅ Ativar",
-    callback: (html) => parseInt(html.find("#ca-valor").val()) || 0,
-  });
-
-  if (!resultado || resultado <= 0) return;
-
-  await caSetFlag(actor.id, resultado, true);
-  ui.notifications.info(`⚕️ Cura Acelerada ${resultado} ativada para ${actor.name}`);
-
-  ChatMessage.create({
-    content: `
-      <div style="background:#0a1a0a;border:1px solid #1a5a1a;border-top:3px solid #27ae60;
-        border-radius:6px;padding:10px;font-family:'Crimson Text',serif;color:#d4e8d0">
-        <div style="color:#27ae60;font-family:'Cinzel',serif;font-weight:bold;
-          margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #1a4a1a">
-          ⚕️ Cura Acelerada Ativa
-        </div>
-        <b>${actor.name}</b> recupera <b style="color:#27ae60">${resultado} PV</b> no início de cada rodada.
-      </div>`,
-    speaker: ChatMessage.getSpeaker(),
-  });
-});
-
-// ── Aplica cura ao início de cada nova rodada ─────────────
-Hooks.on("updateCombat", async (combat, update) => {
-  if (!game.user.isGM) return;
-
-  // Dispara apenas quando a rodada avança (round aumentou)
-  const rodadaAvancou = "round" in update && update.round > (combat.previous?.round ?? 0);
-  if (!rodadaAvancou) return;
-
-  const curas = caGetAll();
-  for (const [actorId, estado] of Object.entries(curas)) {
-    if (!estado.ativo) continue;
-
-    // Busca o token na cena ativa primeiro, depois no compêndio de atores
-    const token = game.scenes.active?.tokens.find(
-      t => t.actorId === actorId || t.actor?.id === actorId
-    );
-    const actor = token?.actor ?? game.actors.get(actorId);
-    if (!actor) continue;
-
-    const pvAtual = foundry.utils.getProperty(actor, "system.attributes.pv.value");
-    const pvMax   = foundry.utils.getProperty(actor, "system.attributes.pv.max");
-    if (pvAtual === undefined || pvAtual >= pvMax) continue;
-
-    const pvNovo = Math.min(pvMax, pvAtual + estado.valor);
-    const curado = pvNovo - pvAtual;
-
-    await actor.update({ "system.attributes.pv.value": pvNovo });
-
-    ChatMessage.create({
-      content: `
-        <div style="background:#0a1a0a;border:1px solid #1a4a1a;border-top:3px solid #27ae60;
-          border-radius:6px;padding:8px 12px;font-family:'Crimson Text',serif;color:#d4e8d0">
-          ⚕️ <b>${actor.name}</b> — Cura Acelerada:
-          <b style="color:#27ae60">+${curado} PV</b>
-          <span style="color:#6a8a6a;font-size:0.85em"> (${pvNovo}/${pvMax})</span>
-        </div>`,
-      speaker: ChatMessage.getSpeaker({ actor }),
-      whisper: [game.users.find(u => u.isGM)?.id].filter(Boolean),
-    });
-  }
-});
-
-// ── Limpa flags ao encerrar o combate ────────────────────
-Hooks.on("deleteCombat", async (combat) => {
-  if (!game.user.isGM) return;
-  // As flags morrem junto com o documento de combate — nada a fazer.
-  // Mas notificamos se havia curas ativas.
-  const curas = combat.getFlag("arsenal-t20", "curaAcelerada") ?? {};
-  const ativos = Object.values(curas).filter(e => e.ativo).length;
-  if (ativos > 0)
-    ui.notifications.info(`⚕️ Combate encerrado — ${ativos} Cura(s) Acelerada(s) desativada(s).`);
-});
-
-// ── Detecta cura acelerada em fichas (NPC e jogadores) ────
-Hooks.on("renderActorSheet", (sheet, html) => {
-  if (!game.user.isGM) return;
-  const actor = sheet.actor;
-
-  // Busca "cura acelerada X" nos itens e na biografia
-  let valorEncontrado = 0;
-  for (const item of actor.items) {
-    const desc  = (item.system?.description?.value ?? "").toLowerCase();
-    const match = desc.match(/cura\s+acelerada[\s:(]+(\d+)/i);
-    if (match) valorEncontrado = Math.max(valorEncontrado, parseInt(match[1]));
-  }
-  const descAtor  = (actor.system?.details?.biography?.value ?? "").toLowerCase();
-  const matchAtor = descAtor.match(/cura\s+acelerada[\s:(]+(\d+)/i);
-  if (matchAtor) valorEncontrado = Math.max(valorEncontrado, parseInt(matchAtor[1]));
-
-  if (!valorEncontrado) return;
-
-  // Lê estado persistido
-  const estado = caGetActor(actor.id);
-  const ativo  = estado?.ativo ?? false;
-
-  const btnLabel = ativo
-    ? `⚕️ Cura Acelerada ${valorEncontrado} — ATIVA`
-    : `⚕️ Cura Acelerada ${valorEncontrado} — desativada`;
-  const btnStyle = ativo
-    ? "background:#0a2a0a;border:1px solid #27ae60;color:#27ae60;"
-    : "background:#1a1a26;border:1px solid #3a3a50;color:#6a6a8a;";
-
-  const btnHtml = $(`
-    <button class="arsenal-ca-toggle"
-      style="${btnStyle}border-radius:4px;padding:4px 10px;cursor:pointer;
-        font-family:'Cinzel',serif;font-size:0.78em;font-weight:bold;
-        margin:4px 6px;transition:all 0.2s;width:calc(100% - 12px)">
-      ${btnLabel}
-    </button>`);
-
-  btnHtml.on("click", async (e) => {
-    e.preventDefault();
-    if (!game.combat) {
-      ui.notifications.warn("⚕️ Nenhum combate ativo. Inicie um combate primeiro.");
-      return;
-    }
-    const estadoAtual = caGetActor(actor.id);
-    if (estadoAtual?.ativo) {
-      await caSetFlag(actor.id, valorEncontrado, false);
-      ui.notifications.info(`⚕️ Cura Acelerada desativada para ${actor.name}`);
-    } else {
-      await caSetFlag(actor.id, valorEncontrado, true);
-      ui.notifications.info(`⚕️ Cura Acelerada ${valorEncontrado} ativada para ${actor.name}`);
-    }
-    sheet.render();
-  });
-
-  const header = html.find(".sheet-header");
-  if (header.length) header.after(btnHtml);
-  else html.find(".window-content").prepend(btnHtml);
-});

@@ -493,11 +493,29 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
           data-condicoes-falhar="${condicoesAoFalhar.join(',')}"
           data-condicoes-passar="${condicoesAoPassar.join(',')}"
           data-poder="0"
+          data-evasao="0"
           title="Sucesso: ÷2 | Falha: total"
           style="flex:1;padding:5px 3px;border-radius:4px;cursor:pointer;font-size:0.78em;
             background:linear-gradient(135deg,#1a4a1a,#2a6a2a);
             border:1px solid #3a8a3a;color:#fff;font-weight:bold">
           🎲 ${salvLabel}
+        </button>
+        <button class="t20-salvar t20-btn-primario"
+          data-salv-pericia="${salvPericia}"
+          data-salv-label="${salvLabel}"
+          data-cd="${cd}"
+          data-item="${nomeItem}"
+          data-dano="${danoRolado ?? 0}"
+          data-tipo-dano="${tipoDano}"
+          data-condicoes-falhar="${condicoesAoFalhar.join(',')}"
+          data-condicoes-passar="${condicoesAoPassar.join(',')}"
+          data-poder="0"
+          data-evasao="1"
+          title="Evasão Simples — Sucesso: sem dano | Falha: dano total"
+          style="flex:1;padding:5px 3px;border-radius:4px;cursor:pointer;font-size:0.78em;
+            background:linear-gradient(135deg,#2a3a1a,#3a5a1a);
+            border:1px solid #5a8a2a;color:#fff;font-weight:bold">
+          🌀 Evasão
         </button>
         <button class="t20-salvar t20-btn-primario"
           data-salv-pericia="${salvPericia}"
@@ -560,10 +578,15 @@ async function rolarSalvamento(btn) {
   const cor     = sucesso ? "#27ae60" : "#e74c3c";
   const label   = sucesso ? "✅ SUCESSO!" : "❌ FALHOU!";
 
-  // Com poder: sucesso = ÷4, falha = ÷2 | Sem poder: sucesso = ÷2, falha = total
+  // Com poder (Evasão Aprimorada): sucesso = ÷4, falha = ÷2
+  // Evasão simples: sucesso = 0, falha = total
+  // Sem evasão: sucesso = ÷2, falha = total
+  const temEvasao = btn.dataset.evasao === "1";
   let danoFinal = temPoder
     ? (sucesso ? Math.floor(danoBase / 4) : Math.floor(danoBase / 2))
-    : (sucesso ? Math.floor(danoBase / 2) : danoBase);
+    : temEvasao
+      ? (sucesso ? 0 : danoBase)
+      : (sucesso ? Math.floor(danoBase / 2) : danoBase);
   let notaDano  = "";
 
   if (danoBase > 0) {
@@ -593,11 +616,15 @@ async function rolarSalvamento(btn) {
 
       const prefixo = temPoder
         ? (sucesso
-            ? `✅ Sucesso + Poder! Dano: ${danoBase}÷4 = ${Math.floor(danoBase/4)}`
-            : `❌ Falhou + Poder! Dano: ${danoBase}÷2 = ${Math.floor(danoBase/2)}`)
-        : (sucesso
-            ? `✅ Sucesso! Dano: ${danoBase}÷2 = ${Math.floor(danoBase/2)}`
-            : `❌ Falhou! Dano total: ${danoBase}`);
+            ? `✅ Sucesso + Evasão Aprimorada! Dano: ${danoBase}÷4 = ${Math.floor(danoBase/4)}`
+            : `❌ Falhou + Evasão Aprimorada! Dano: ${danoBase}÷2 = ${Math.floor(danoBase/2)}`)
+        : temEvasao
+          ? (sucesso
+              ? `🌀 Evasão! Sem dano.`
+              : `❌ Falhou! Dano total: ${danoBase}`)
+          : (sucesso
+              ? `✅ Sucesso! Dano: ${danoBase}÷2 = ${Math.floor(danoBase/2)}`
+              : `❌ Falhou! Dano total: ${danoBase}`);
       notaDano = prefixo + notaDano;
 
       if (danoFinal > 0) {
@@ -753,9 +780,12 @@ async function rolarSalvamentoCustom({ actor, cd, nomeItem, danoBase, tipoDano,
   const cor     = sucesso ? "#27ae60" : "#e74c3c";
   const label   = sucesso ? "✅ SUCESSO!" : "❌ FALHOU!";
 
+  const temEvasaoC = btn?.dataset?.evasao === "1";
   let danoFinal = temPoder
     ? (sucesso ? Math.floor(danoBase / 4) : Math.floor(danoBase / 2))
-    : (sucesso ? Math.floor(danoBase / 2) : danoBase);
+    : temEvasaoC
+      ? (sucesso ? 0 : danoBase)
+      : (sucesso ? Math.floor(danoBase / 2) : danoBase);
 
   let notaDano = "";
 
@@ -784,8 +814,10 @@ async function rolarSalvamentoCustom({ actor, cd, nomeItem, danoBase, tipoDano,
       }
 
       const prefixo = temPoder
-        ? (sucesso ? `✅ Sucesso+Poder! ${danoBase}÷4=${Math.floor(danoBase/4)}` : `❌ Falhou+Poder! ${danoBase}÷2=${Math.floor(danoBase/2)}`)
-        : (sucesso ? `✅ Sucesso! ${danoBase}÷2=${Math.floor(danoBase/2)}` : `❌ Falhou! Dano total: ${danoBase}`);
+        ? (sucesso ? `✅ Sucesso+Evasão Apr.! ${danoBase}÷4=${Math.floor(danoBase/4)}` : `❌ Falhou+Evasão Apr.! ${danoBase}÷2=${Math.floor(danoBase/2)}`)
+        : temEvasaoC
+          ? (sucesso ? `🌀 Evasão! Sem dano.` : `❌ Falhou! Dano total: ${danoBase}`)
+          : (sucesso ? `✅ Sucesso! ${danoBase}÷2=${Math.floor(danoBase/2)}` : `❌ Falhou! Dano total: ${danoBase}`);
       notaDano = prefixo + notaDano;
 
       if (danoFinal > 0) {
@@ -969,3 +1001,173 @@ async function aplicarCondicoes(actor, condicoes, nomeItem) {
     </div>`
   });
 }
+
+// ============================================================
+// CURA ACELERADA
+// ============================================================
+
+// Estado em memória: { actorId: { valor, ativo } }
+const curaAceleradaAtiva = {};
+
+// ── Detecta "cura acelerada" em mensagens de chat ──────────
+Hooks.on("createChatMessage", async (message) => {
+  if (!game.user.isGM) return;
+
+  const texto = message.content?.toLowerCase() ?? "";
+  const flags  = message.flags?.tormenta20 ?? {};
+  const itemData = flags.itemData ?? null;
+
+  // Checa texto da mensagem ou descrição do item
+  const descItem = (itemData?.description?.value ?? "").toLowerCase();
+  const temCuraAcelerada = /cura\s+acelerada/.test(texto) || /cura\s+acelerada/.test(descItem);
+  if (!temCuraAcelerada) return;
+
+  // Tenta extrair valor do texto (ex: "cura acelerada 5" ou "cura acelerada (10)")
+  const matchValor = (texto + " " + descItem).match(/cura\s+acelerada[\s:(]+(\d+)/i);
+  const valorSugerido = matchValor ? parseInt(matchValor[1]) : "";
+
+  // Identifica o ator que usou
+  const speaker = message.speaker;
+  const actor = speaker.token
+    ? game.scenes.active?.tokens.get(speaker.token)?.actor
+    : game.actors.get(speaker.actor);
+  if (!actor) return;
+
+  // Abre prompt para confirmar/definir o valor
+  const resultado = await Dialog.prompt({
+    title: "⚕️ Cura Acelerada",
+    content: `
+      <div style="padding:10px;font-family:'Crimson Text',serif">
+        <p style="margin-bottom:8px">
+          <b style="color:#27ae60">${actor.name}</b> usou um poder com Cura Acelerada.<br>
+          Defina quantos PV serão recuperados por rodada:
+        </p>
+        <div style="display:flex;align-items:center;gap:10px">
+          <label style="font-weight:bold">PV por rodada:</label>
+          <input id="ca-valor" type="number" min="1" value="${valorSugerido}"
+            style="width:70px;padding:4px 8px;background:#1a1a26;border:1px solid #3a3a50;
+              color:#e8d5b7;border-radius:4px;font-size:1.1em;text-align:center">
+        </div>
+      </div>`,
+    label: "✅ Ativar",
+    callback: (html) => parseInt(html.find("#ca-valor").val()) || 0,
+  });
+
+  if (!resultado || resultado <= 0) return;
+
+  curaAceleradaAtiva[actor.id] = { valor: resultado, ativo: true };
+  ui.notifications.info(`⚕️ Cura Acelerada ${resultado} ativada para ${actor.name}`);
+
+  // Posta aviso no chat
+  ChatMessage.create({
+    content: `
+      <div style="background:#0a1a0a;border:1px solid #1a5a1a;border-top:3px solid #27ae60;
+        border-radius:6px;padding:10px;font-family:'Crimson Text',serif;color:#d4e8d0">
+        <div style="color:#27ae60;font-family:'Cinzel',serif;font-weight:bold;
+          margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #1a4a1a">
+          ⚕️ Cura Acelerada Ativa
+        </div>
+        <b>${actor.name}</b> recupera <b style="color:#27ae60">${resultado} PV</b> no início de cada rodada.
+      </div>`,
+    speaker: ChatMessage.getSpeaker(),
+  });
+});
+
+// ── Aplica cura ao início de cada rodada ──────────────────
+Hooks.on("updateCombat", async (combat, update) => {
+  // Só dispara na virada de rodada (round aumentou) e no turno 0
+  if (!game.user.isGM) return;
+  if (!("round" in update)) return;
+  if (combat.turn !== 0 && update.turn !== 0) return;
+
+  for (const [actorId, estado] of Object.entries(curaAceleradaAtiva)) {
+    if (!estado.ativo) continue;
+
+    const actor = game.actors.get(actorId)
+      ?? game.scenes.active?.tokens.find(t => t.actorId === actorId)?.actor;
+    if (!actor) continue;
+
+    const pvAtual = actor.system.attributes.pv.value;
+    const pvMax   = actor.system.attributes.pv.max;
+    if (pvAtual >= pvMax) continue; // já está cheio
+
+    const pvNovo = Math.min(pvMax, pvAtual + estado.valor);
+    const curado = pvNovo - pvAtual;
+
+    await actor.update({ "system.attributes.pv.value": pvNovo });
+
+    ChatMessage.create({
+      content: `
+        <div style="background:#0a1a0a;border:1px solid #1a4a1a;border-left:3px solid #27ae60;
+          border-radius:0 4px 4px 0;padding:6px 10px;font-family:'Crimson Text',serif;color:#d4e8d0;font-size:0.9em">
+          ⚕️ <b>${actor.name}</b> — Cura Acelerada: 
+          <b style="color:#27ae60">+${curado} PV</b>
+          <span style="color:#6a8a6a;font-size:0.85em">(${pvNovo}/${pvMax})</span>
+        </div>`,
+      speaker: ChatMessage.getSpeaker({ actor }),
+      whisper: [game.users.find(u => u.isGM)?.id].filter(Boolean),
+    });
+  }
+});
+
+// ── Detecta cura acelerada em fichas de NPC ───────────────
+Hooks.on("renderActorSheet", (sheet, html) => {
+  if (!game.user.isGM) return;
+  const actor = sheet.actor;
+  if (actor.type !== "npc" && actor.type !== "character") return;
+
+  // Busca em todos os itens do ator
+  let valorEncontrado = 0;
+  for (const item of actor.items) {
+    const desc = (item.system?.description?.value ?? "").toLowerCase();
+    const match = desc.match(/cura\s+acelerada[\s:(]+(\d+)/i);
+    if (match) {
+      valorEncontrado = Math.max(valorEncontrado, parseInt(match[1]));
+    }
+  }
+  // Também busca na descrição do próprio ator
+  const descAtor = (actor.system?.details?.biography?.value ?? "").toLowerCase();
+  const matchAtor = descAtor.match(/cura\s+acelerada[\s:(]+(\d+)/i);
+  if (matchAtor) valorEncontrado = Math.max(valorEncontrado, parseInt(matchAtor[1]));
+
+  if (!valorEncontrado) return;
+
+  const estado = curaAceleradaAtiva[actor.id];
+  const ativo  = estado?.ativo ?? false;
+
+  // Injeta botão no header da ficha
+  const btnLabel = ativo
+    ? `⚕️ Cura Acelerada ${valorEncontrado} — ATIVA`
+    : `⚕️ Cura Acelerada ${valorEncontrado} — desativada`;
+  const btnStyle = ativo
+    ? "background:#1a5a1a;border:1px solid #27ae60;color:#27ae60;"
+    : "background:#1a1a26;border:1px solid #3a3a50;color:#6a6a8a;";
+
+  const btnHtml = $(`
+    <button class="arsenal-ca-toggle"
+      style="${btnStyle}border-radius:4px;padding:3px 10px;cursor:pointer;
+        font-family:'Cinzel',serif;font-size:0.78em;font-weight:bold;
+        margin:4px 6px;transition:all 0.2s;width:calc(100% - 12px)">
+      ${btnLabel}
+    </button>`);
+
+  btnHtml.on("click", (e) => {
+    e.preventDefault();
+    if (curaAceleradaAtiva[actor.id]?.ativo) {
+      curaAceleradaAtiva[actor.id].ativo = false;
+      ui.notifications.info(`⚕️ Cura Acelerada desativada para ${actor.name}`);
+    } else {
+      curaAceleradaAtiva[actor.id] = { valor: valorEncontrado, ativo: true };
+      ui.notifications.info(`⚕️ Cura Acelerada ${valorEncontrado} ativada para ${actor.name}`);
+    }
+    sheet.render(); // re-renderiza para atualizar o botão
+  });
+
+  // Insere logo após o header da ficha
+  const header = html.find(".sheet-header");
+  if (header.length) {
+    header.after(btnHtml);
+  } else {
+    html.find(".window-content").prepend(btnHtml);
+  }
+});

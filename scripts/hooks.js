@@ -762,28 +762,28 @@ async function abrirDialogCustom(btn) {
           </option>
           ${opcoesHabilidades}
         </select>
-        <div id="t20-mod-preview" style="margin-top:5px;font-size:0.82em;color:#888;min-height:1.2em"></div>
+        <div id="t20-mod-preview" style="margin-top:5px;font-size:0.82em;color:#aaa;min-height:1.4em;font-style:italic"></div>
       </div>
 
-    </div>
-    <script>
-      // Preview ao trocar habilidade
-      document.getElementById("t20-mod-habilidade")?.addEventListener("change", function() {
-        const opt = this.options[this.selectedIndex];
-        const bonus    = parseInt(opt.dataset.bonus) || 0;
-        const evaApr   = opt.dataset.evasaoApr === "1";
-        const evaSimp  = opt.dataset.evasaoSimp === "1";
-        const prev     = document.getElementById("t20-mod-preview");
-        if (evaApr)       prev.textContent = "Evasão Aprimorada: sucesso ÷4 | falha ÷2";
-        else if (evaSimp) prev.textContent = "Evasão Simples: sucesso sem dano | falha total";
-        else if (bonus)   prev.textContent = "Adiciona +" + bonus + " ao bônus do teste";
-        else              prev.textContent = "";
-      });
-    </script>`;
+    </div>`;
 
-  new Dialog({
+  const dlg = new Dialog({
     title: `⚙️ Modificador — ${nomeItem}`,
     content: conteudo,
+    render: (html) => {
+      // Wire up preview after dialog renders
+      html.find("#t20-mod-habilidade").on("change", function() {
+        const opt    = this.options[this.selectedIndex];
+        const bonus  = parseInt(opt.dataset.bonus) || 0;
+        const evaApr = opt.dataset.evasaoApr === "1";
+        const evaSimp = opt.dataset.evasaoSimp === "1";
+        const prev   = html.find("#t20-mod-preview");
+        if (evaApr)        prev.text("Evasão Aprimorada: sucesso ÷4 | falha ÷2");
+        else if (evaSimp)  prev.text("Evasão Simples: sucesso sem dano | falha total");
+        else if (bonus)    prev.text("Adiciona +" + bonus + " ao bônus do teste");
+        else               prev.text("");
+      });
+    },
     buttons: {
       rolar: {
         label: "🎲 Rolar",
@@ -818,7 +818,8 @@ async function abrirDialogCustom(btn) {
       cancelar: { label: "Cancelar" }
     },
     default: "rolar",
-  }).render(true);
+  });
+  dlg.render(true);
 }
 
 async function rolarSalvamentoCustom({ actor, cd, nomeItem, danoBase, tipoDano,
@@ -833,7 +834,7 @@ async function rolarSalvamentoCustom({ actor, cd, nomeItem, danoBase, tipoDano,
   const cor     = sucesso ? "#27ae60" : "#e74c3c";
   const label   = sucesso ? "✅ SUCESSO!" : "❌ FALHOU!";
 
-  const temEvasaoC = btn?.dataset?.evasao === "1" || evasaoSimples;
+  const temEvasaoC = evasaoSimples;
   let danoFinal = temPoder
     ? (sucesso ? Math.floor(danoBase / 4) : Math.floor(danoBase / 2))
     : temEvasaoC

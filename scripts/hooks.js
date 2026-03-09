@@ -684,29 +684,33 @@ async function abrirDialogCustom(btn) {
   const bVont = pericias?.vont?.value ?? 0;
   const labelPericia = { refl: "Reflexos", fort: "Fortitude", vont: "Vontade" };
 
-  // ── Coleta habilidades relevantes dos itens do personagem ──
-  // Busca poderes/habilidades que modificam testes de resistência
+  // ── Coleta habilidades relevantes dos itens E da ficha do personagem ──
   const PALAVRAS_CHAVE = [
     "reflexos", "fortitude", "vontade", "salvamento", "resistência",
     "evasão", "resistir", "teste de", "bônus em", "bonus em",
+    "resistencia a", "resistência a",
   ];
+
+  // Padrão genérico para extrair "resistência a X +N" de texto corrido
+  // Ex: "resistência a magia +5", "resistência a medo +5"
+  const REGEX_RESIST_TEXTO = /resistên?cia\s+a\s+([\w\s]+?)\s*[+](\d+)/gi;
+
   const habilidades = [];
+
+  // 1) Itens do ator
   for (const item of actor.items) {
     const nome = item.name ?? "";
     const desc = (item.system?.description?.value ?? "").replace(/<[^>]+>/g, " ").toLowerCase();
     const relevante = PALAVRAS_CHAVE.some(p => desc.includes(p) || nome.toLowerCase().includes(p));
     if (!relevante) continue;
 
-    // Tenta extrair bônus numérico mencionado na descrição
     const matchBonus = desc.match(/[+]\s*(\d+)\s*(?:em|nos?|nos?\s+testes?|de bônus)/i);
     const bonusSugerido = matchBonus ? parseInt(matchBonus[1]) : null;
-
-    // Tenta detectar tipo de evasão
-    const eEvasaoApr = /evasão aprimorada/i.test(nome) || /evasão aprimorada/i.test(desc);
+    const eEvasaoApr  = /evasão aprimorada/i.test(nome) || /evasão aprimorada/i.test(desc);
     const eEvasaoSimp = !eEvasaoApr && (/evasão/i.test(nome) || /evasão/i.test(desc));
 
     habilidades.push({
-      id:    item.id,
+      id:   item.id,
       nome,
       bonus: bonusSugerido,
       evasaoAprimorada: eEvasaoApr,
@@ -714,17 +718,67 @@ async function abrirDialogCustom(btn) {
     });
   }
 
+  // 2) Texto corrido da ficha (detalhes/biografia — onde NPCs têm seus traços)
+  //    Busca campos comuns do sistema T20
+  const camposTexto = [
+    actor.system?.details?.biography?.value ?? "",
+    actor.system?.details?.notes?.value     ?? "",
+    actor.system?.details?.appearance?.value ?? "",
+    actor.system?.attributes?.resistencias?.value ?? "",
+    // Alguns sistemas guardam em "tracos" como texto
+    actor.system?.tracos?.especiais?.value ?? "",
+  ];
+  const textoFicha = camposTexto
+    .join(" ")
+    .replace(/<[^>]+>/g, " ");
+
+  // Também verifica o próprio nome + valor na linha de detalhes principais
+  // (ex: "Fort: +21, Refl: +8, Vont: +15, imunidade a Confuso, resistência a magia +5")
+  // Tenta extrair direto dos campos de atributo estruturados se existirem
+  const resistTexto = textoFicha + " " + (actor.system?.details?.source ?? "");
+
+  let m;
+  REGEX_RESIST_TEXTO.lastIndex = 0;
+  const vistas = new Set();
+  while ((m = REGEX_RESIST_TEXTO.exec(resistTexto)) !== null) {
+    const tipoResist = m[1].trim().toLowerCase();
+    const valorResist = parseInt(m[2]);
+    const chave = `resist_${tipoResist}`;
+    if (vistas.has(chave)) continue;
+    vistas.add(chave);
+
+    // Mapeia tipo de resistência → qual perícia de salvamento é relevante
+    // "resistência a magia" → Vontade/Fortitude/Reflexos (genérico — bônus em todos)
+    // "resistência a medo"  → Vontade
+    // Deixamos como bônus genérico; o jogador pode ajustar o atributo no select
+    habilidades.push({
+      id:   chave,
+      nome: `Resistência a ${m[1].trim()} (+${valorResist})`,
+      bonus: valorResist,
+      evasaoAprimorada: false,
+      evasaoSimples:    false,
+      // Sugestão de perícia para auto-selecionar
+      periciaAssociada: tipoResist.includes("medo") || tipoResist.includes("encantamento")
+        ? "vont"
+        : tipoResist.includes("veneno") || tipoResist.includes("doença")
+          ? "fort"
+          : null, // null = sem sugestão, fica com o padrão do efeito
+    });
+  }
+
   // Monta opções de habilidades para o select
   const opcoesHabilidades = habilidades.length > 0
     ? habilidades.map(h => {
         let label = h.nome;
-        if (h.evasaoAprimorada)  label += " — Evasão Aprimorada (÷4/÷2)";
-        else if (h.evasaoSimples) label += " — Evasão Simples (sem dano/total)";
-        else if (h.bonus !== null) label += ` — +${h.bonus} bônus`;
+        if (h.evasaoAprimorada)   label += " — Evasão Aprimorada (÷4/÷2)";
+        else if (h.evasaoSimples)  label += " — Evasão Simples (sem dano/total)";
+        // bônus já aparece no nome para resistências de texto; só adiciona para itens
+        else if (h.bonus !== null && !h.id.startsWith("resist_")) label += ` — +${h.bonus} bônus`;
         return `<option value="${h.id}"
           data-bonus="${h.bonus ?? 0}"
           data-evasao-apr="${h.evasaoAprimorada ? 1 : 0}"
-          data-evasao-simp="${h.evasaoSimples ? 1 : 0}">
+          data-evasao-simp="${h.evasaoSimples ? 1 : 0}"
+          data-pericia="${h.periciaAssociada ?? ""}">
           ${label}
         </option>`;
       }).join("")
@@ -771,17 +825,21 @@ async function abrirDialogCustom(btn) {
     title: `⚙️ Modificador — ${nomeItem}`,
     content: conteudo,
     render: (html) => {
-      // Wire up preview after dialog renders
       html.find("#t20-mod-habilidade").on("change", function() {
-        const opt    = this.options[this.selectedIndex];
-        const bonus  = parseInt(opt.dataset.bonus) || 0;
-        const evaApr = opt.dataset.evasaoApr === "1";
-        const evaSimp = opt.dataset.evasaoSimp === "1";
-        const prev   = html.find("#t20-mod-preview");
+        const opt      = this.options[this.selectedIndex];
+        const bonus    = parseInt(opt.dataset.bonus) || 0;
+        const evaApr   = opt.dataset.evasaoApr === "1";
+        const evaSimp  = opt.dataset.evasaoSimp === "1";
+        const pericia  = opt.dataset.pericia;
+        const prev     = html.find("#t20-mod-preview");
+
         if (evaApr)        prev.text("Evasão Aprimorada: sucesso ÷4 | falha ÷2");
         else if (evaSimp)  prev.text("Evasão Simples: sucesso sem dano | falha total");
-        else if (bonus)    prev.text("Adiciona +" + bonus + " ao bônus do teste");
+        else if (bonus)    prev.text("+" + bonus + " no teste de salvamento");
         else               prev.text("");
+
+        // Auto-selecionar atributo sugerido pela resistência
+        if (pericia) html.find("#t20-mod-pericia").val(pericia);
       });
     },
     buttons: {

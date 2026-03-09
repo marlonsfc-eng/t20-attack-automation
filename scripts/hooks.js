@@ -1007,33 +1007,55 @@ async function aplicarCondicoes(actor, condicoes, nomeItem) {
 // ============================================================
 
 // Estado em memória: { actorId: { valor, ativo } }
-const curaAceleradaAtiva = {};
+// ── Helpers de persistência: flags no Combat ─────────────
+// Salva/lê a lista de curas ativas como flag no combate ativo
+async function caSetFlag(actorId, valor, ativo) {
+  const combat = game.combat;
+  if (!combat) return;
+  const atual = caGetAll();
+  atual[actorId] = { valor, ativo };
+  await combat.setFlag("arsenal-t20", "curaAcelerada", atual);
+}
+
+async function caRemoveFlag(actorId) {
+  const combat = game.combat;
+  if (!combat) return;
+  const atual = caGetAll();
+  delete atual[actorId];
+  await combat.setFlag("arsenal-t20", "curaAcelerada", atual);
+}
+
+function caGetAll() {
+  return foundry.utils.deepClone(
+    game.combat?.getFlag("arsenal-t20", "curaAcelerada") ?? {}
+  );
+}
+
+function caGetActor(actorId) {
+  return caGetAll()[actorId] ?? null;
+}
 
 // ── Detecta "cura acelerada" em mensagens de chat ──────────
 Hooks.on("createChatMessage", async (message) => {
   if (!game.user.isGM) return;
 
-  const texto = message.content?.toLowerCase() ?? "";
-  const flags  = message.flags?.tormenta20 ?? {};
+  const texto    = message.content?.toLowerCase() ?? "";
+  const flags    = message.flags?.tormenta20 ?? {};
   const itemData = flags.itemData ?? null;
-
-  // Checa texto da mensagem ou descrição do item
   const descItem = (itemData?.description?.value ?? "").toLowerCase();
+
   const temCuraAcelerada = /cura\s+acelerada/.test(texto) || /cura\s+acelerada/.test(descItem);
   if (!temCuraAcelerada) return;
 
-  // Tenta extrair valor do texto (ex: "cura acelerada 5" ou "cura acelerada (10)")
-  const matchValor = (texto + " " + descItem).match(/cura\s+acelerada[\s:(]+(\d+)/i);
+  const matchValor   = (texto + " " + descItem).match(/cura\s+acelerada[\s:(]+(\d+)/i);
   const valorSugerido = matchValor ? parseInt(matchValor[1]) : "";
 
-  // Identifica o ator que usou
   const speaker = message.speaker;
-  const actor = speaker.token
+  const actor   = speaker.token
     ? game.scenes.active?.tokens.get(speaker.token)?.actor
     : game.actors.get(speaker.actor);
   if (!actor) return;
 
-  // Abre prompt para confirmar/definir o valor
   const resultado = await Dialog.prompt({
     title: "⚕️ Cura Acelerada",
     content: `
@@ -1055,10 +1077,9 @@ Hooks.on("createChatMessage", async (message) => {
 
   if (!resultado || resultado <= 0) return;
 
-  curaAceleradaAtiva[actor.id] = { valor: resultado, ativo: true };
+  await caSetFlag(actor.id, resultado, true);
   ui.notifications.info(`⚕️ Cura Acelerada ${resultado} ativada para ${actor.name}`);
 
-  // Posta aviso no chat
   ChatMessage.create({
     content: `
       <div style="background:#0a1a0a;border:1px solid #1a5a1a;border-top:3px solid #27ae60;
@@ -1073,23 +1094,28 @@ Hooks.on("createChatMessage", async (message) => {
   });
 });
 
-// ── Aplica cura ao início de cada rodada ──────────────────
+// ── Aplica cura ao início de cada nova rodada ─────────────
 Hooks.on("updateCombat", async (combat, update) => {
-  // Só dispara na virada de rodada (round aumentou) e no turno 0
   if (!game.user.isGM) return;
-  if (!("round" in update)) return;
-  if (combat.turn !== 0 && update.turn !== 0) return;
 
-  for (const [actorId, estado] of Object.entries(curaAceleradaAtiva)) {
+  // Dispara apenas quando a rodada avança (round aumentou)
+  const rodadaAvancou = "round" in update && update.round > (combat.previous?.round ?? 0);
+  if (!rodadaAvancou) return;
+
+  const curas = caGetAll();
+  for (const [actorId, estado] of Object.entries(curas)) {
     if (!estado.ativo) continue;
 
-    const actor = game.actors.get(actorId)
-      ?? game.scenes.active?.tokens.find(t => t.actorId === actorId)?.actor;
+    // Busca o token na cena ativa primeiro, depois no compêndio de atores
+    const token = game.scenes.active?.tokens.find(
+      t => t.actorId === actorId || t.actor?.id === actorId
+    );
+    const actor = token?.actor ?? game.actors.get(actorId);
     if (!actor) continue;
 
-    const pvAtual = actor.system.attributes.pv.value;
-    const pvMax   = actor.system.attributes.pv.max;
-    if (pvAtual >= pvMax) continue; // já está cheio
+    const pvAtual = foundry.utils.getProperty(actor, "system.attributes.pv.value");
+    const pvMax   = foundry.utils.getProperty(actor, "system.attributes.pv.max");
+    if (pvAtual === undefined || pvAtual >= pvMax) continue;
 
     const pvNovo = Math.min(pvMax, pvAtual + estado.valor);
     const curado = pvNovo - pvAtual;
@@ -1098,11 +1124,11 @@ Hooks.on("updateCombat", async (combat, update) => {
 
     ChatMessage.create({
       content: `
-        <div style="background:#0a1a0a;border:1px solid #1a4a1a;border-left:3px solid #27ae60;
-          border-radius:0 4px 4px 0;padding:6px 10px;font-family:'Crimson Text',serif;color:#d4e8d0;font-size:0.9em">
-          ⚕️ <b>${actor.name}</b> — Cura Acelerada: 
+        <div style="background:#0a1a0a;border:1px solid #1a4a1a;border-top:3px solid #27ae60;
+          border-radius:6px;padding:8px 12px;font-family:'Crimson Text',serif;color:#d4e8d0">
+          ⚕️ <b>${actor.name}</b> — Cura Acelerada:
           <b style="color:#27ae60">+${curado} PV</b>
-          <span style="color:#6a8a6a;font-size:0.85em">(${pvNovo}/${pvMax})</span>
+          <span style="color:#6a8a6a;font-size:0.85em"> (${pvNovo}/${pvMax})</span>
         </div>`,
       speaker: ChatMessage.getSpeaker({ actor }),
       whisper: [game.users.find(u => u.isGM)?.id].filter(Boolean),
@@ -1110,64 +1136,72 @@ Hooks.on("updateCombat", async (combat, update) => {
   }
 });
 
-// ── Detecta cura acelerada em fichas de NPC ───────────────
+// ── Limpa flags ao encerrar o combate ────────────────────
+Hooks.on("deleteCombat", async (combat) => {
+  if (!game.user.isGM) return;
+  // As flags morrem junto com o documento de combate — nada a fazer.
+  // Mas notificamos se havia curas ativas.
+  const curas = combat.getFlag("arsenal-t20", "curaAcelerada") ?? {};
+  const ativos = Object.values(curas).filter(e => e.ativo).length;
+  if (ativos > 0)
+    ui.notifications.info(`⚕️ Combate encerrado — ${ativos} Cura(s) Acelerada(s) desativada(s).`);
+});
+
+// ── Detecta cura acelerada em fichas (NPC e jogadores) ────
 Hooks.on("renderActorSheet", (sheet, html) => {
   if (!game.user.isGM) return;
   const actor = sheet.actor;
-  if (actor.type !== "npc" && actor.type !== "character") return;
 
-  // Busca em todos os itens do ator
+  // Busca "cura acelerada X" nos itens e na biografia
   let valorEncontrado = 0;
   for (const item of actor.items) {
-    const desc = (item.system?.description?.value ?? "").toLowerCase();
+    const desc  = (item.system?.description?.value ?? "").toLowerCase();
     const match = desc.match(/cura\s+acelerada[\s:(]+(\d+)/i);
-    if (match) {
-      valorEncontrado = Math.max(valorEncontrado, parseInt(match[1]));
-    }
+    if (match) valorEncontrado = Math.max(valorEncontrado, parseInt(match[1]));
   }
-  // Também busca na descrição do próprio ator
-  const descAtor = (actor.system?.details?.biography?.value ?? "").toLowerCase();
+  const descAtor  = (actor.system?.details?.biography?.value ?? "").toLowerCase();
   const matchAtor = descAtor.match(/cura\s+acelerada[\s:(]+(\d+)/i);
   if (matchAtor) valorEncontrado = Math.max(valorEncontrado, parseInt(matchAtor[1]));
 
   if (!valorEncontrado) return;
 
-  const estado = curaAceleradaAtiva[actor.id];
+  // Lê estado persistido
+  const estado = caGetActor(actor.id);
   const ativo  = estado?.ativo ?? false;
 
-  // Injeta botão no header da ficha
   const btnLabel = ativo
     ? `⚕️ Cura Acelerada ${valorEncontrado} — ATIVA`
     : `⚕️ Cura Acelerada ${valorEncontrado} — desativada`;
   const btnStyle = ativo
-    ? "background:#1a5a1a;border:1px solid #27ae60;color:#27ae60;"
+    ? "background:#0a2a0a;border:1px solid #27ae60;color:#27ae60;"
     : "background:#1a1a26;border:1px solid #3a3a50;color:#6a6a8a;";
 
   const btnHtml = $(`
     <button class="arsenal-ca-toggle"
-      style="${btnStyle}border-radius:4px;padding:3px 10px;cursor:pointer;
+      style="${btnStyle}border-radius:4px;padding:4px 10px;cursor:pointer;
         font-family:'Cinzel',serif;font-size:0.78em;font-weight:bold;
         margin:4px 6px;transition:all 0.2s;width:calc(100% - 12px)">
       ${btnLabel}
     </button>`);
 
-  btnHtml.on("click", (e) => {
+  btnHtml.on("click", async (e) => {
     e.preventDefault();
-    if (curaAceleradaAtiva[actor.id]?.ativo) {
-      curaAceleradaAtiva[actor.id].ativo = false;
+    if (!game.combat) {
+      ui.notifications.warn("⚕️ Nenhum combate ativo. Inicie um combate primeiro.");
+      return;
+    }
+    const estadoAtual = caGetActor(actor.id);
+    if (estadoAtual?.ativo) {
+      await caSetFlag(actor.id, valorEncontrado, false);
       ui.notifications.info(`⚕️ Cura Acelerada desativada para ${actor.name}`);
     } else {
-      curaAceleradaAtiva[actor.id] = { valor: valorEncontrado, ativo: true };
+      await caSetFlag(actor.id, valorEncontrado, true);
       ui.notifications.info(`⚕️ Cura Acelerada ${valorEncontrado} ativada para ${actor.name}`);
     }
-    sheet.render(); // re-renderiza para atualizar o botão
+    sheet.render();
   });
 
-  // Insere logo após o header da ficha
   const header = html.find(".sheet-header");
-  if (header.length) {
-    header.after(btnHtml);
-  } else {
-    html.find(".window-content").prepend(btnHtml);
-  }
+  if (header.length) header.after(btnHtml);
+  else html.find(".window-content").prepend(btnHtml);
 });

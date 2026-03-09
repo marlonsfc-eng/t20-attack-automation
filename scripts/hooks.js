@@ -524,7 +524,9 @@ async function criarCartaoSalvamento({ nomeItem, imgItem, nomeConjurador,
 async function rolarSalvamento(btn) {
   const salvPericia = btn.dataset.salvPericia;
   const salvLabel   = btn.dataset.salvLabel;
-  const cdInput     = btn.closest("div")?.querySelector(".t20-cd-input");
+  // Busca o input de CD subindo até o card inteiro (.t20-card ou a mensagem)
+  const card        = btn.closest(".t20-card") ?? btn.closest(".message-content") ?? btn.parentElement;
+  const cdInput     = card?.querySelector(".t20-cd-input");
   const cd          = cdInput ? parseInt(cdInput.value) : parseInt(btn.dataset.cd);
   const nomeItem    = btn.dataset.item;
   const danoBase    = parseInt(btn.dataset.dano) || 0;
@@ -538,7 +540,8 @@ async function rolarSalvamento(btn) {
 
   const pericias = actor.system?.pericias ?? {};
   const pericia  = pericias[salvPericia];
-  const bonus    = pericia?.value ?? 0;
+  // T20 pode guardar em .value, .total, ou .mod — tenta os três
+  const bonus    = pericia?.total ?? pericia?.value ?? pericia?.mod ?? 0;
 
   const roll    = await new Roll(`1d20 + ${bonus}`).evaluate();
   const sucesso = roll.total >= cd;
@@ -884,9 +887,12 @@ async function rolarSalvamentoCustom({ actor, cd, nomeItem, danoBase, tipoDano,
     salvPericia, salvLabel, bonusExtra, temPoder, evasaoSimples = false, condicoesFalhar = [], condicoesPassar = [] }) {
 
   const pericias = actor.system?.pericias ?? {};
-  const bonus    = (pericias[salvPericia]?.value ?? 0) + bonusExtra;
+  const p        = pericias[salvPericia];
+  const bonusBase = p?.total ?? p?.value ?? p?.mod ?? 0;
+  const bonus     = bonusBase + bonusExtra;
   const bonusStr = bonusExtra !== 0 ? ` ${bonusExtra > 0 ? "+" : ""}${bonusExtra} custom` : "";
 
+  console.log(`Arsenal T20 | rolarSalvamentoCustom | pericia=${salvPericia} bonusBase=${bonusBase} bonusExtra=${bonusExtra} total=${bonus} cd=${cd}`);
   const roll    = await new Roll(`1d20 + ${bonus}`).evaluate();
   const sucesso = roll.total >= cd;
   const cor     = sucesso ? "#27ae60" : "#e74c3c";

@@ -539,19 +539,10 @@ async function rolarSalvamento(btn) {
   if (!actor) return ui.notifications.warn("Selecione seu token antes de rolar!");
 
   const pericias = actor.system?.pericias ?? {};
-  const pericia  = pericias[salvPericia];
-  // T20 pode guardar em .value, .total, ou .mod — tenta os três
+  const _pRaw    = pericias[salvPericia];
+  // T20 às vezes serializa a perícia como string JSON — faz o parse se necessário
+  const pericia  = typeof _pRaw === "string" ? JSON.parse(_pRaw) : (_pRaw ?? {});
   const bonus    = pericia?.total ?? pericia?.value ?? pericia?.mod ?? 0;
-
-  // LOG de diagnóstico — aparece no console F12
-  console.log("Arsenal T20 | rolarSalvamento |", {
-    salvPericia,
-    pericia: JSON.stringify(pericia),
-    bonus,
-    cd,
-    actor: actor.name,
-    sistemaPericiasKeys: Object.keys(pericias).slice(0, 10),
-  });
 
   const roll    = await new Roll(`1d20 + ${bonus}`).evaluate();
   const sucesso = roll.total >= cd;
@@ -692,9 +683,10 @@ async function abrirDialogCustom(btn) {
 
   // Bônus de perícias de salvamento
   const pericias = actor.system?.pericias ?? {};
-  const bRefl = pericias?.refl?.value ?? 0;
-  const bFort = pericias?.fort?.value ?? 0;
-  const bVont = pericias?.vont?.value ?? 0;
+  const _parsePer = (k) => { const r = pericias[k]; return typeof r === "string" ? JSON.parse(r) : (r ?? {}); };
+  const bRefl = _parsePer("refl")?.value ?? 0;
+  const bFort = _parsePer("fort")?.value ?? 0;
+  const bVont = _parsePer("vont")?.value ?? 0;
   const labelPericia = { refl: "Reflexos", fort: "Fortitude", vont: "Vontade" };
 
   // ── Coleta habilidades relevantes dos itens E da ficha do personagem ──
@@ -896,8 +888,9 @@ async function abrirDialogCustom(btn) {
 async function rolarSalvamentoCustom({ actor, cd, nomeItem, danoBase, tipoDano,
     salvPericia, salvLabel, bonusExtra, temPoder, evasaoSimples = false, condicoesFalhar = [], condicoesPassar = [] }) {
 
-  const pericias = actor.system?.pericias ?? {};
-  const p        = pericias[salvPericia];
+  const pericias  = actor.system?.pericias ?? {};
+  const _pRaw2    = pericias[salvPericia];
+  const p         = typeof _pRaw2 === "string" ? JSON.parse(_pRaw2) : (_pRaw2 ?? {});
   const bonusBase = p?.total ?? p?.value ?? p?.mod ?? 0;
   const bonus     = bonusBase + bonusExtra;
   const bonusStr = bonusExtra !== 0 ? ` ${bonusExtra > 0 ? "+" : ""}${bonusExtra} custom` : "";

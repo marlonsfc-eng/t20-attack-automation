@@ -2,7 +2,7 @@
   "id": "arsenal-t20",
   "title": "Arsenal T20",
   "description": "Automação de combate para o sistema Tormenta20. Detecta acertos, erros e críticos, aplica dano com resistências, gera testes de resistência automáticos e aplica condições em caso de falha.",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "compatibility": {
     "minimum": "11",
     "verified": "13"

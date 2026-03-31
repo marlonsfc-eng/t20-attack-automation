@@ -223,21 +223,33 @@ async function criarMensagemGM(totalAtaque, dadosAlvos, danoPorTipo, danoTotal) 
     let danoFinalTotal = 0;
     let linhasDano = [];
 
+    let danoPerda = 0; // perda de PV (reduz pvMax também)
+
     if (temDano && a.acertou) {
       const isCrit = a.possivelCritico;
 
       for (const [tipo, valor] of Object.entries(danoPorTipo)) {
-        // Ignora entradas sem valor real
         if (isNaN(valor) || valor === null) continue;
 
-        const tipoNorm = tipo === "perfuração" ? "perfuracao" : tipo;
+        const tipoNorm  = tipo === "perfuração" ? "perfuracao" : tipo;
         const valorCrit = isCrit ? valor * 2 : valor;
+        const ePerda    = tipoNorm === "perda";
+
+        if (ePerda) {
+          // Perda de PV não sofre RD nem resistências — aplica direto
+          danoPerda += valorCrit;
+          linhasDano.push(`
+            <div style="font-size:0.82em;color:#c0392b;padding:2px 0">
+              perda de PV: ${valor}${isCrit ? " ×2" : ""} → <b>${valorCrit}</b> (reduz PV máx)
+            </div>`);
+          continue;
+        }
 
         const { dano, notas } = calcularDanoComResistencias(valorCrit, tipoNorm, a.tracos);
         danoFinalTotal += dano;
 
-        const notaStr = notas.length ? ` (${notas.join(", ")})` : "";
-        const critStr = isCrit ? ` ×2` : "";
+        const notaStr  = notas.length ? ` (${notas.join(", ")})` : "";
+        const critStr  = isCrit ? ` ×2` : "";
         const tipoLabel = tipo !== "sem_tipo" ? tipo : "sem tipo específico";
         const corLinha = dano === 0 ? "#666" : dano < valorCrit ? "#e67e22" : "#ccc";
 
@@ -247,7 +259,7 @@ async function criarMensagemGM(totalAtaque, dadosAlvos, danoPorTipo, danoTotal) 
           </div>`);
       }
 
-      // RD geral aplicada ao total
+      // RD geral aplicada ao total de dano normal (não à perda de PV)
       if (a.rdGeral > 0 && danoFinalTotal > 0) {
         const antes = danoFinalTotal;
         danoFinalTotal = Math.max(0, danoFinalTotal - a.rdGeral);
@@ -282,23 +294,26 @@ async function criarMensagemGM(totalAtaque, dadosAlvos, danoPorTipo, danoTotal) 
           ${linhasDano.join("")}
           <div style="font-size:0.9em;font-weight:bold;color:#e8d5b7;margin-top:4px;
             border-top:1px solid rgba(255,255,255,0.1);padding-top:4px">
-            Total final: ${danoFinalTotal}
+            Total final: ${danoFinalTotal + danoPerda}
+            ${danoPerda > 0 ? `<span style="font-size:0.85em;color:#c0392b"> (${danoFinalTotal} dano + ${danoPerda} perda de PV)</span>` : ""}
           </div>
         </div>
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="t20-aplicar"
             data-token="${a.tokenId}"
             data-dano="${danoFinalTotal}"
+            data-dano-perda="${danoPerda}"
             style="flex:1;padding:5px;border-radius:4px;cursor:pointer;
               background:#7a1a1a;border:1px solid #a02020;color:#fff;font-size:0.85em">
-            💔 Aplicar ${danoFinalTotal} de Dano
+            💔 Aplicar ${danoFinalTotal + danoPerda} de Dano
           </button>
           <button class="t20-metade"
             data-token="${a.tokenId}"
             data-dano="${Math.floor(danoFinalTotal / 2)}"
+            data-dano-perda="${Math.floor(danoPerda / 2)}"
             style="flex:1;padding:5px;border-radius:4px;cursor:pointer;
               background:#2c3e50;border:1px solid #3d5166;color:#fff;font-size:0.85em">
-            🛡️ Metade (${Math.floor(danoFinalTotal / 2)})
+            🛡️ Metade (${Math.floor((danoFinalTotal + danoPerda) / 2)})
           </button>
         </div>` : a.acertou ? `
         <div style="font-size:0.8em;color:#e67e22;margin-top:6px">
@@ -324,31 +339,53 @@ async function criarMensagemGM(totalAtaque, dadosAlvos, danoPorTipo, danoTotal) 
 }
 
 async function aplicarDano(btn) {
-  const tokenId = btn.dataset.token;
-  const dano    = parseInt(btn.dataset.dano) || 0;
-  const token   = canvas.tokens.get(tokenId);
+  const tokenId   = btn.dataset.token;
+  const dano      = parseInt(btn.dataset.dano) || 0;
+  const danoPerda = parseInt(btn.dataset.danoPerda) || 0;
+  const token     = canvas.tokens.get(tokenId);
   if (!token) return;
 
-  if (dano <= 0) {
+  if (dano <= 0 && danoPerda <= 0) {
     return ChatMessage.create({
       content: `🛡️ <b>${token.name}</b> absorveu todo o dano.`
     });
   }
 
-  const hpPath  = "system.attributes.pv.value";
-  const pvAtual = foundry.utils.getProperty(token.actor, hpPath);
+  const pvPath    = "system.attributes.pv.value";
+  const pvMaxPath = "system.attributes.pv.max";
+  const pvAtual   = foundry.utils.getProperty(token.actor, pvPath);
+  const pvMax     = foundry.utils.getProperty(token.actor, pvMaxPath) ?? pvAtual;
   if (pvAtual === undefined) return ui.notifications.warn("PV não encontrado!");
 
-  const pvMax  = foundry.utils.getProperty(token.actor, "system.attributes.pv.max") ?? pvAtual;
-  const novoPV = Math.max(0, pvAtual - dano);
+  let novoMax = pvMax;
+  let novoPV  = pvAtual;
+  const update = {};
+  let msgExtra = "";
 
-  await token.actor.update({ [hpPath]: novoPV });
+  // Perda de PV: reduz pvMax E pvAtual pelo mesmo valor
+  if (danoPerda > 0) {
+    novoMax = Math.max(0, pvMax  - danoPerda);
+    novoPV  = Math.max(0, pvAtual - danoPerda);
+    update[pvMaxPath] = novoMax;
+    update[pvPath]    = novoPV;
+    msgExtra += `<br>💀 Perda de PV: máx ${pvMax} → <b>${novoMax}</b>`;
+  }
 
-  const cor = novoPV === 0 ? "red" : novoPV <= pvMax / 2 ? "orange" : "green";
+  // Dano normal: reduz apenas pvAtual
+  if (dano > 0) {
+    novoPV = Math.max(0, novoPV - dano);
+    update[pvPath] = novoPV;
+  }
+
+  await token.actor.update(update);
+
+  const cor = novoPV === 0 ? "red" : novoPV <= novoMax / 2 ? "orange" : "green";
+  const danTotal = dano + danoPerda;
 
   ChatMessage.create({
-    content: `💔 <b>${token.name}</b> sofreu <b>${dano} de dano</b>.<br>
-      PV: ${pvAtual} → <span style="color:${cor}"><b>${novoPV}</b></span>
+    content: `💔 <b>${token.name}</b> sofreu <b>${danTotal} de dano</b>.<br>
+      PV: ${pvAtual} → <span style="color:${cor}"><b>${novoPV}</b>/${novoMax}</span>
+      ${msgExtra}
       ${novoPV === 0 ? "<br>💀 <b>Incapacitado!</b>" : ""}`
   });
 

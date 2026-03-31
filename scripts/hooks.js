@@ -408,12 +408,6 @@ Hooks.on("createChatMessage", async (message, options, userId) => {
   const nomeItem  = nomeMatch?.[1] ?? "Habilidade";
   const imgItem   = imgMatch?.[1]  ?? "";
 
-  // CD do conjurador: 10 + metade do nível + atributo de conjuração + bônus de onUseEffects
-  const atribConjuracao = actor.system?.attributes?.conjuracao ?? "int";
-  const valorAtrib = actor.system?.atributos?.[atribConjuracao]?.value ?? 0;
-  const nivel      = actor.system?.attributes?.level?.value ?? actor.system?.details?.level?.value ?? 0;
-  const metadeNivel = Math.floor(nivel / 2);
-
   // Extrair bônus de CD dos efeitos ativos (ex: "Fortalecimento Arcano: +1 na CD de magias")
   const onUseEffects = message.flags?.tormenta20?.onUseEffects ?? [];
   let bonusCD = 0;
@@ -425,7 +419,11 @@ Hooks.on("createChatMessage", async (message, options, userId) => {
     }
   }
 
-  const cd = 10 + metadeNivel + valorAtrib + bonusCD;
+  // CD de magias: attributes.cd (base = 10 + metade nível) + atributos[conjuracao].value + bonusCD
+  const atribConjuracao = actor.system?.attributes?.conjuracao ?? "int";
+  const cdBase    = actor.system?.attributes?.cd ?? 0;        // ex: 12 (10 + metade nível)
+  const valorAtrib = actor.system?.atributos?.[atribConjuracao]?.value ?? 0; // ex: +3 INT
+  const cd = cdBase + valorAtrib + bonusCD;
 
   // Dano da magia
   const rolls       = itemData?.rolls ?? [];

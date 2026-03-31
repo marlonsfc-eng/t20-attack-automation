@@ -1,3 +1,4 @@
+
 // hooks.js - Tormenta20 Attack Automation v1.6
 
 Hooks.once("ready", () => {

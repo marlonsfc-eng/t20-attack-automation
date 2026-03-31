@@ -314,9 +314,10 @@ async function criarMensagemGM(totalAtaque, dadosAlvos, danoPorTipo, danoTotal) 
     whisper: ChatMessage.getWhisperRecipients("GM")
   });
 
-  Hooks.once("renderChatMessage", (msg, html) => {
+  Hooks.once("renderChatMessageHTML", (msg, html) => {
     if (msg.id !== novaMsg.id) return;
-    html[0].querySelectorAll(".t20-aplicar, .t20-metade").forEach(btn =>
+    // html is now HTMLElement directly in v13+
+    html.querySelectorAll(".t20-aplicar, .t20-metade").forEach(btn =>
       btn.addEventListener("click", () => aplicarDano(btn))
     );
   })
@@ -407,23 +408,24 @@ Hooks.on("createChatMessage", async (message, options, userId) => {
   const nomeItem  = nomeMatch?.[1] ?? "Habilidade";
   const imgItem   = imgMatch?.[1]  ?? "";
 
-  // CD do conjurador: 15 + atributo de conjuração + bônus de onUseEffects
+  // CD do conjurador: 10 + metade do nível + atributo de conjuração + bônus de onUseEffects
   const atribConjuracao = actor.system?.attributes?.conjuracao ?? "int";
   const valorAtrib = actor.system?.atributos?.[atribConjuracao]?.value ?? 0;
+  const nivel      = actor.system?.attributes?.level?.value ?? actor.system?.details?.level?.value ?? 0;
+  const metadeNivel = Math.floor(nivel / 2);
 
   // Extrair bônus de CD dos efeitos ativos (ex: "Fortalecimento Arcano: +1 na CD de magias")
   const onUseEffects = message.flags?.tormenta20?.onUseEffects ?? [];
   let bonusCD = 0;
   for (const efeito of onUseEffects) {
     const desc = efeito.description ?? "";
-    // Procura padrões como "+1 na CD" ou "+2 na CD"
     const match = desc.match(/\+(\d+)\s+na\s+CD/i);
     if (match) {
       bonusCD += parseInt(match[1]) * (parseInt(efeito.qty) || 1);
     }
   }
 
-  const cd = 15 + valorAtrib + bonusCD;
+  const cd = 10 + metadeNivel + valorAtrib + bonusCD;
 
   // Dano da magia
   const rolls       = itemData?.rolls ?? [];
@@ -656,13 +658,14 @@ async function rolarSalvamento(btn) {
 }
 
 // Listener global persistente para botões de salvamento
-Hooks.on("renderChatMessage", (message, html) => {
-  html[0].querySelectorAll(".t20-salvar").forEach(btn => {
+Hooks.on("renderChatMessageHTML", (message, html) => {
+  // html is HTMLElement directly in v13+
+  html.querySelectorAll(".t20-salvar").forEach(btn => {
     if (btn.dataset.listenerAdded) return;
     btn.dataset.listenerAdded = "1";
     btn.addEventListener("click", () => rolarSalvamento(btn));
   });
-  html[0].querySelectorAll(".t20-custom").forEach(btn => {
+  html.querySelectorAll(".t20-custom").forEach(btn => {
     if (btn.dataset.listenerAdded) return;
     btn.dataset.listenerAdded = "1";
     btn.addEventListener("click", () => abrirDialogCustom(btn));
